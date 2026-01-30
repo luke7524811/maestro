@@ -18,6 +18,7 @@ import {
 import { useWebSocket } from './hooks/useWebSocket';
 import { SessionCard, writeToSession } from './components/SessionCard';
 import { SessionSettings } from './components/SessionSettings';
+import { AppSettings } from './components/AppSettings';
 import {
   SessionInfo,
   SessionStatus,
@@ -63,6 +64,7 @@ const App: React.FC = () => {
   const [projectPath, setProjectPath] = useState<string>('');
   const [isRunning, setIsRunning] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
+  const [showAppSettings, setShowAppSettings] = useState(false);
   const terminalWritersRef = useRef<Map<number, (data: string) => void>>(new Map());
 
   const {
@@ -304,6 +306,15 @@ const App: React.FC = () => {
           <LegendItem status={SessionStatus.Done} />
           <LegendItem status={SessionStatus.Error} />
         </div>
+
+        {/* App settings button */}
+        <button
+          onClick={() => setShowAppSettings(true)}
+          className="p-2 rounded-lg hover:bg-ctp-surface0 text-ctp-subtext0 hover:text-ctp-mauve"
+          title="Application Settings"
+        >
+          <Settings className="w-4 h-4" />
+        </button>
       </header>
 
       {/* Main content */}
@@ -479,6 +490,11 @@ const App: React.FC = () => {
           }}
           onSaveAsProfile={(name) => handleSaveAsProfile(editingSessionId, name)}
         />
+      )}
+
+      {/* App settings modal */}
+      {showAppSettings && (
+        <AppSettings onClose={() => setShowAppSettings(false)} />
       )}
     </div>
   );

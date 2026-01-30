@@ -15,16 +15,60 @@ import {
 export class ProfileManager extends EventEmitter {
   private profiles: Map<string, SessionProfile> = new Map();
   private profilesPath: string;
+  private configPath: string;
   private allowedDirectories: string[];
+  private configDir: string;
 
   constructor(configDir: string = '/app/config') {
     super();
+    this.configDir = configDir;
     this.profilesPath = path.join(configDir, 'profiles.json');
-    // Directories users can browse - can be extended via env var
-    // Default includes common mount points for Docker volumes
-    const defaultDirs = '/workspace,/root,/home,/mnt,/data,/projects,/app';
-    this.allowedDirectories = (process.env.ALLOWED_DIRECTORIES || defaultDirs).split(',').map(d => d.trim());
+    this.configPath = path.join(configDir, 'config.json');
+
+    // Load directories from config file, env var, or use defaults
+    this.allowedDirectories = this.loadAllowedDirectories();
     this.loadProfiles();
+  }
+
+  // Load allowed directories from config file or defaults
+  private loadAllowedDirectories(): string[] {
+    const defaultDirs = ['/workspace', '/root', '/home', '/mnt', '/data', '/projects', '/app'];
+
+    // First try config file
+    try {
+      if (fs.existsSync(this.configPath)) {
+        const config = JSON.parse(fs.readFileSync(this.configPath, 'utf-8'));
+        if (config.allowedDirectories && Array.isArray(config.allowedDirectories)) {
+          console.log(`Loaded ${config.allowedDirectories.length} allowed directories from config`);
+          return config.allowedDirectories;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load config:', error);
+    }
+
+    // Then try env var
+    if (process.env.ALLOWED_DIRECTORIES) {
+      return process.env.ALLOWED_DIRECTORIES.split(',').map(d => d.trim());
+    }
+
+    // Fall back to defaults
+    return defaultDirs;
+  }
+
+  // Save config to disk
+  private saveConfig(): void {
+    try {
+      if (!fs.existsSync(this.configDir)) {
+        fs.mkdirSync(this.configDir, { recursive: true });
+      }
+      const config = {
+        allowedDirectories: this.allowedDirectories
+      };
+      fs.writeFileSync(this.configPath, JSON.stringify(config, null, 2), 'utf-8');
+    } catch (error) {
+      console.error('Failed to save config:', error);
+    }
   }
 
   // Load profiles from disk
@@ -172,6 +216,55 @@ export class ProfileManager extends EventEmitter {
   // Get allowed directories for browsing
   getAllowedDirectories(): string[] {
     return this.allowedDirectories;
+  }
+
+  // Add a new allowed directory
+  addAllowedDirectory(dirPath: string): boolean {
+    const normalizedPath = path.normalize(dirPath);
+
+    // Check if already exists
+    if (this.allowedDirectories.includes(normalizedPath)) {
+      return false;
+    }
+
+    // Verify directory exists
+    try {
+      const stats = fs.statSync(normalizedPath);
+      if (!stats.isDirectory()) {
+        throw new Error('Path is not a directory');
+      }
+    } catch (error) {
+      console.error(`Cannot add directory ${normalizedPath}:`, error);
+      throw new Error(`Directory does not exist: ${normalizedPath}`);
+    }
+
+    this.allowedDirectories.push(normalizedPath);
+    this.allowedDirectories.sort();
+    this.saveConfig();
+    this.emit('configUpdated', { allowedDirectories: this.allowedDirectories });
+    return true;
+  }
+
+  // Remove an allowed directory
+  removeAllowedDirectory(dirPath: string): boolean {
+    const normalizedPath = path.normalize(dirPath);
+    const index = this.allowedDirectories.indexOf(normalizedPath);
+
+    if (index === -1) {
+      return false;
+    }
+
+    this.allowedDirectories.splice(index, 1);
+    this.saveConfig();
+    this.emit('configUpdated', { allowedDirectories: this.allowedDirectories });
+    return true;
+  }
+
+  // Set all allowed directories at once
+  setAllowedDirectories(directories: string[]): void {
+    this.allowedDirectories = directories.map(d => path.normalize(d));
+    this.saveConfig();
+    this.emit('configUpdated', { allowedDirectories: this.allowedDirectories });
   }
 
   // List directory contents (for file browser)

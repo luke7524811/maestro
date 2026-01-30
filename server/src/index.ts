@@ -278,6 +278,46 @@ app.get('/api/directories/allowed', (req, res) => {
   res.json(profileManager.getAllowedDirectories());
 });
 
+// Add allowed directory
+app.post('/api/directories/allowed', (req, res) => {
+  const { path: dirPath } = req.body;
+  if (!dirPath) {
+    return res.status(400).json({ error: 'Path is required' });
+  }
+  try {
+    const added = profileManager.addAllowedDirectory(dirPath);
+    if (!added) {
+      return res.status(409).json({ error: 'Directory already allowed' });
+    }
+    res.json({ success: true, directories: profileManager.getAllowedDirectories() });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Remove allowed directory
+app.delete('/api/directories/allowed', (req, res) => {
+  const { path: dirPath } = req.body;
+  if (!dirPath) {
+    return res.status(400).json({ error: 'Path is required' });
+  }
+  const removed = profileManager.removeAllowedDirectory(dirPath);
+  if (!removed) {
+    return res.status(404).json({ error: 'Directory not in allowed list' });
+  }
+  res.json({ success: true, directories: profileManager.getAllowedDirectories() });
+});
+
+// Set all allowed directories
+app.put('/api/directories/allowed', (req, res) => {
+  const { directories } = req.body;
+  if (!directories || !Array.isArray(directories)) {
+    return res.status(400).json({ error: 'Directories array is required' });
+  }
+  profileManager.setAllowedDirectories(directories);
+  res.json({ success: true, directories: profileManager.getAllowedDirectories() });
+});
+
 // List directory contents
 app.get('/api/directories', (req, res) => {
   const dirPath = req.query.path as string || '/workspace';
