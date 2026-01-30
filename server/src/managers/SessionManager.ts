@@ -11,7 +11,10 @@ import {
   TerminalMode,
   TerminalModeConfig,
   createSession,
-  TerminalDimensions
+  TerminalDimensions,
+  ClaudePermissionMode,
+  CodexApprovalMode,
+  SessionProfile
 } from '../types/index.js';
 
 interface TerminalSession {
@@ -104,6 +107,56 @@ export class SessionManager extends EventEmitter {
     return sessions;
   }
 
+  // Build CLI command with permission flags and custom options
+  private buildCliCommand(session: TerminalSession): string {
+    const mode = session.info.mode;
+    const modeConfig = TerminalModeConfig[mode];
+    let cmd = modeConfig.command || 'bash';
+
+    // Add permission flags based on mode
+    if (mode === TerminalMode.ClaudeCode && session.info.permissionMode) {
+      switch (session.info.permissionMode) {
+        case ClaudePermissionMode.BypassPermissions:
+          cmd += ' --dangerously-skip-permissions';
+          break;
+        case ClaudePermissionMode.AcceptEdits:
+        case ClaudePermissionMode.Plan:
+        case ClaudePermissionMode.DontAsk:
+          cmd += ` --permission-mode ${session.info.permissionMode}`;
+          break;
+        // 'default' - no flag needed
+      }
+    }
+
+    if (mode === TerminalMode.OpenAiCodex && session.info.permissionMode) {
+      switch (session.info.permissionMode) {
+        case CodexApprovalMode.FullAuto:
+          cmd += ' --full-auto';
+          break;
+        case CodexApprovalMode.DangerousBypass:
+          cmd += ' --dangerously-bypass-approvals-and-sandbox';
+          break;
+        case CodexApprovalMode.OnFailure:
+        case CodexApprovalMode.OnRequest:
+          cmd += ` -a ${session.info.permissionMode}`;
+          break;
+        // 'default' - no flag needed
+      }
+    }
+
+    // Add custom flags
+    if (session.info.customFlags && session.info.customFlags.length > 0) {
+      cmd += ' ' + session.info.customFlags.join(' ');
+    }
+
+    // Apply wrapper command if specified
+    if (session.info.wrapperCommand) {
+      cmd = `${session.info.wrapperCommand} ${cmd}`;
+    }
+
+    return cmd;
+  }
+
   // Launch terminal for session - matches Swift launchTerminal
   launchSession(sessionId: number, workingDir?: string): boolean {
     const session = this.sessions.get(sessionId);
@@ -114,19 +167,22 @@ export class SessionManager extends EventEmitter {
 
     const cwd = workingDir || session.info.workingDirectory || this.projectPath || process.cwd();
     const mode = session.info.mode;
-    const modeConfig = TerminalModeConfig[mode];
 
     // Build shell command - matches Swift launchTerminal logic
     let shellArgs: string[];
     let env = { ...process.env };
+
+    // Inject custom environment variables
+    if (session.info.envVars && Object.keys(session.info.envVars).length > 0) {
+      Object.assign(env, session.info.envVars);
+    }
 
     if (mode === TerminalMode.PlainTerminal) {
       // Plain terminal - interactive login shell
       shellArgs = ['-l', '-i'];
     } else {
       // AI CLI mode - source profiles and launch CLI
-      // Matches Swift command building
-      const cliCommand = modeConfig.command || 'echo "No CLI configured"';
+      const cliCommand = this.buildCliCommand(session);
       const command = `
         if [ -f ~/.zprofile ]; then source ~/.zprofile 2>/dev/null; fi;
         if [ -f ~/.zshrc ]; then source ~/.zshrc 2>/dev/null; fi;
@@ -361,6 +417,64 @@ export class SessionManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session) return;
     session.info.assignedBranch = branch;
+    this.emit('sessionStatusUpdate', session.info);
+  }
+
+  // Set permission mode
+  setPermissionMode(sessionId: number, permissionMode: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.info.isTerminalLaunched) return;
+    session.info.permissionMode = permissionMode;
+    this.emit('sessionStatusUpdate', session.info);
+  }
+
+  // Set custom flags
+  setCustomFlags(sessionId: number, flags: string[]): void {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.info.isTerminalLaunched) return;
+    session.info.customFlags = flags;
+    this.emit('sessionStatusUpdate', session.info);
+  }
+
+  // Set environment variables
+  setEnvVars(sessionId: number, envVars: Record<string, string>): void {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.info.isTerminalLaunched) return;
+    session.info.envVars = envVars;
+    this.emit('sessionStatusUpdate', session.info);
+  }
+
+  // Set wrapper command
+  setWrapperCommand(sessionId: number, wrapper: string | null): void {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.info.isTerminalLaunched) return;
+    session.info.wrapperCommand = wrapper;
+    this.emit('sessionStatusUpdate', session.info);
+  }
+
+  // Set working directory
+  setWorkingDirectory(sessionId: number, dir: string | null): void {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.info.isTerminalLaunched) return;
+    session.info.workingDirectory = dir;
+    this.emit('sessionStatusUpdate', session.info);
+  }
+
+  // Apply profile to session
+  applyProfile(sessionId: number, profile: SessionProfile): void {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.info.isTerminalLaunched) return;
+
+    session.info.mode = profile.mode;
+    session.info.profileId = profile.id;
+    session.info.permissionMode = profile.permissionMode;
+    session.info.customFlags = [...profile.customFlags];
+    session.info.envVars = { ...profile.envVars };
+    session.info.wrapperCommand = profile.wrapperCommand;
+    if (profile.workingDirectory) {
+      session.info.workingDirectory = profile.workingDirectory;
+    }
+
     this.emit('sessionStatusUpdate', session.info);
   }
 

@@ -3,7 +3,7 @@
  * Port of: TerminalSessionView.swift
  */
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   Brain,
   Sparkles,
@@ -19,8 +19,10 @@ import {
   Play,
   ChevronDown,
   ExternalLink,
+  Settings,
   LucideProps
 } from 'lucide-react';
+import { SessionSettings } from './SessionSettings';
 import {
   SessionInfo,
   SessionStatus,
@@ -38,6 +40,8 @@ interface SessionCardProps {
   onInput: (sessionId: number, data: string) => void;
   onResize: (sessionId: number, cols: number, rows: number) => void;
   onSetMode: (sessionId: number, mode: TerminalMode) => void;
+  onUpdateSettings: (sessionId: number, settings: Partial<SessionInfo>) => void;
+  onSaveAsProfile?: (sessionId: number, name: string) => void;
 }
 
 // Icon map for dynamic rendering
@@ -63,9 +67,12 @@ export const SessionCard: React.FC<SessionCardProps> = ({
   onClose,
   onInput,
   onResize,
-  onSetMode
+  onSetMode,
+  onUpdateSettings,
+  onSaveAsProfile
 }) => {
   const terminalRef = useRef<HTMLDivElement>(null);
+  const [showSettings, setShowSettings] = useState(false);
   const statusConfig = SessionStatusConfig[session.status];
   const modeConfig = TerminalModeConfig[session.mode];
   const StatusIcon = StatusIcons[statusConfig.icon] || Circle;
@@ -98,6 +105,18 @@ export const SessionCard: React.FC<SessionCardProps> = ({
 
   // Mode selector dropdown
   const [showModeMenu, setShowModeMenu] = React.useState(false);
+
+  // Handle settings save
+  const handleSettingsSave = useCallback((settings: Partial<SessionInfo>) => {
+    onUpdateSettings(session.id, settings);
+  }, [session.id, onUpdateSettings]);
+
+  // Handle save as profile
+  const handleSaveAsProfile = useCallback((name: string) => {
+    if (onSaveAsProfile) {
+      onSaveAsProfile(session.id, name);
+    }
+  }, [session.id, onSaveAsProfile]);
 
   // Border color based on status
   const borderColor = statusConfig.color;
@@ -170,6 +189,17 @@ export const SessionCard: React.FC<SessionCardProps> = ({
             <span className="opacity-50">⎇</span>
             {session.assignedBranch}
           </span>
+        )}
+
+        {/* Settings button (pre-launch) */}
+        {!showTerminal && !session.shouldLaunchTerminal && (
+          <button
+            onClick={() => setShowSettings(true)}
+            className="p-1 rounded hover:bg-ctp-surface0"
+            title="Session Settings"
+          >
+            <Settings className="w-4 h-4 text-ctp-subtext0 hover:text-ctp-mauve" />
+          </button>
         )}
 
         {/* Launch button (pre-launch) */}
@@ -274,6 +304,16 @@ export const SessionCard: React.FC<SessionCardProps> = ({
 
           <div className="flex-1" />
         </div>
+      )}
+
+      {/* Settings modal */}
+      {showSettings && (
+        <SessionSettings
+          session={session}
+          onClose={() => setShowSettings(false)}
+          onSave={handleSettingsSave}
+          onSaveAsProfile={handleSaveAsProfile}
+        />
       )}
     </div>
   );

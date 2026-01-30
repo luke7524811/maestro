@@ -101,6 +101,104 @@ export interface SessionInfo {
   customRunCommand: string | null;
   isAppRunning: boolean;
   serverURL: string | null;
+  // Profile-related fields
+  profileId: string | null;
+  permissionMode: string;
+  customFlags: string[];
+  envVars: Record<string, string>;
+  wrapperCommand: string | null;
+}
+
+// Permission modes for Claude Code
+export enum ClaudePermissionMode {
+  Default = 'default',
+  AcceptEdits = 'acceptEdits',
+  BypassPermissions = 'bypassPermissions',
+  Plan = 'plan',
+  DontAsk = 'dontAsk'
+}
+
+// Approval modes for OpenAI Codex
+export enum CodexApprovalMode {
+  Default = 'default',
+  OnFailure = 'on-failure',
+  OnRequest = 'on-request',
+  FullAuto = 'full-auto',
+  DangerousBypass = 'dangerous-bypass'
+}
+
+// Permission mode configs for UI
+export const PermissionModeConfig: Record<TerminalMode, {
+  modes: string[];
+  labels: Record<string, string>;
+  descriptions: Record<string, string>
+}> = {
+  [TerminalMode.ClaudeCode]: {
+    modes: Object.values(ClaudePermissionMode),
+    labels: {
+      [ClaudePermissionMode.Default]: 'Default',
+      [ClaudePermissionMode.AcceptEdits]: 'Accept Edits',
+      [ClaudePermissionMode.BypassPermissions]: 'Bypass All',
+      [ClaudePermissionMode.Plan]: 'Plan Mode',
+      [ClaudePermissionMode.DontAsk]: "Don't Ask"
+    },
+    descriptions: {
+      [ClaudePermissionMode.Default]: 'Normal interactive permissions',
+      [ClaudePermissionMode.AcceptEdits]: 'Auto-accept file edits',
+      [ClaudePermissionMode.BypassPermissions]: 'Skip all permission checks (dangerous)',
+      [ClaudePermissionMode.Plan]: 'Plan mode only, no execution',
+      [ClaudePermissionMode.DontAsk]: 'Execute without asking'
+    }
+  },
+  [TerminalMode.OpenAiCodex]: {
+    modes: Object.values(CodexApprovalMode),
+    labels: {
+      [CodexApprovalMode.Default]: 'Default',
+      [CodexApprovalMode.OnFailure]: 'On Failure',
+      [CodexApprovalMode.OnRequest]: 'On Request',
+      [CodexApprovalMode.FullAuto]: 'Full Auto',
+      [CodexApprovalMode.DangerousBypass]: 'Bypass All'
+    },
+    descriptions: {
+      [CodexApprovalMode.Default]: 'Interactive approval for commands',
+      [CodexApprovalMode.OnFailure]: 'Auto-run, ask only on failure',
+      [CodexApprovalMode.OnRequest]: 'Model decides when to ask',
+      [CodexApprovalMode.FullAuto]: 'Sandboxed automatic execution',
+      [CodexApprovalMode.DangerousBypass]: 'Skip all checks (dangerous)'
+    }
+  },
+  [TerminalMode.GeminiCli]: {
+    modes: ['default'],
+    labels: { default: 'Default' },
+    descriptions: { default: 'Standard Gemini CLI mode' }
+  },
+  [TerminalMode.PlainTerminal]: {
+    modes: ['default'],
+    labels: { default: 'Default' },
+    descriptions: { default: 'Standard shell' }
+  }
+};
+
+// Session profile - saveable configuration
+export interface SessionProfile {
+  id: string;
+  name: string;
+  mode: TerminalMode;
+  permissionMode: string;
+  workingDirectory: string | null;
+  customFlags: string[];
+  envVars: Record<string, string>;
+  wrapperCommand: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Directory entry for file browser
+export interface DirectoryEntry {
+  name: string;
+  path: string;
+  isDirectory: boolean;
 }
 
 export interface GridConfiguration {

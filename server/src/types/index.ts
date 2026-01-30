@@ -114,6 +114,12 @@ export interface SessionInfo {
   customRunCommand: string | null;
   isAppRunning: boolean;
   serverURL: string | null;
+  // Profile-related fields
+  profileId: string | null;
+  permissionMode: string;
+  customFlags: string[];
+  envVars: Record<string, string>;
+  wrapperCommand: string | null;
 }
 
 // Create default session - matches Swift init
@@ -133,7 +139,13 @@ export function createSession(id: number, mode: TerminalMode = TerminalMode.Clau
     assignedPort: null,
     customRunCommand: null,
     isAppRunning: false,
-    serverURL: null
+    serverURL: null,
+    // Profile defaults
+    profileId: null,
+    permissionMode: 'default',
+    customFlags: [],
+    envVars: {},
+    wrapperCommand: null
   };
 }
 
@@ -167,6 +179,104 @@ export interface WSMessage {
 export interface TerminalDimensions {
   cols: number;
   rows: number;
+}
+
+// Permission modes for Claude Code
+export enum ClaudePermissionMode {
+  Default = 'default',
+  AcceptEdits = 'acceptEdits',
+  BypassPermissions = 'bypassPermissions',
+  Plan = 'plan',
+  DontAsk = 'dontAsk'
+}
+
+// Approval modes for OpenAI Codex
+export enum CodexApprovalMode {
+  Default = 'default',
+  OnFailure = 'on-failure',
+  OnRequest = 'on-request',
+  FullAuto = 'full-auto',
+  DangerousBypass = 'dangerous-bypass'
+}
+
+// Permission mode configs for UI
+export const PermissionModeConfig: Record<TerminalMode, { modes: string[]; labels: Record<string, string>; descriptions: Record<string, string> }> = {
+  [TerminalMode.ClaudeCode]: {
+    modes: Object.values(ClaudePermissionMode),
+    labels: {
+      [ClaudePermissionMode.Default]: 'Default',
+      [ClaudePermissionMode.AcceptEdits]: 'Accept Edits',
+      [ClaudePermissionMode.BypassPermissions]: 'Bypass All',
+      [ClaudePermissionMode.Plan]: 'Plan Mode',
+      [ClaudePermissionMode.DontAsk]: "Don't Ask"
+    },
+    descriptions: {
+      [ClaudePermissionMode.Default]: 'Normal interactive permissions',
+      [ClaudePermissionMode.AcceptEdits]: 'Auto-accept file edits',
+      [ClaudePermissionMode.BypassPermissions]: 'Skip all permission checks (dangerous)',
+      [ClaudePermissionMode.Plan]: 'Plan mode only, no execution',
+      [ClaudePermissionMode.DontAsk]: 'Execute without asking'
+    }
+  },
+  [TerminalMode.OpenAiCodex]: {
+    modes: Object.values(CodexApprovalMode),
+    labels: {
+      [CodexApprovalMode.Default]: 'Default',
+      [CodexApprovalMode.OnFailure]: 'On Failure',
+      [CodexApprovalMode.OnRequest]: 'On Request',
+      [CodexApprovalMode.FullAuto]: 'Full Auto',
+      [CodexApprovalMode.DangerousBypass]: 'Bypass All'
+    },
+    descriptions: {
+      [CodexApprovalMode.Default]: 'Interactive approval for commands',
+      [CodexApprovalMode.OnFailure]: 'Auto-run, ask only on failure',
+      [CodexApprovalMode.OnRequest]: 'Model decides when to ask',
+      [CodexApprovalMode.FullAuto]: 'Sandboxed automatic execution',
+      [CodexApprovalMode.DangerousBypass]: 'Skip all checks (dangerous)'
+    }
+  },
+  [TerminalMode.GeminiCli]: {
+    modes: ['default'],
+    labels: { default: 'Default' },
+    descriptions: { default: 'Standard Gemini CLI mode' }
+  },
+  [TerminalMode.PlainTerminal]: {
+    modes: ['default'],
+    labels: { default: 'Default' },
+    descriptions: { default: 'Standard shell' }
+  }
+};
+
+// Session profile - saveable configuration
+export interface SessionProfile {
+  id: string;
+  name: string;
+  mode: TerminalMode;
+  permissionMode: string;
+  workingDirectory: string | null;
+  customFlags: string[];
+  envVars: Record<string, string>;
+  wrapperCommand: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Create default profile
+export function createDefaultProfile(mode: TerminalMode): SessionProfile {
+  return {
+    id: `default-${mode.toLowerCase().replace(/\s+/g, '-')}`,
+    name: `Default ${mode}`,
+    mode,
+    permissionMode: 'default',
+    workingDirectory: null,
+    customFlags: [],
+    envVars: {},
+    wrapperCommand: null,
+    isDefault: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
 }
 
 // Grid configuration - matches Swift GridConfiguration

@@ -9,10 +9,12 @@ import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { sessionManager } from './managers/SessionManager.js';
+import { profileManager } from './managers/ProfileManager.js';
 import { wsManager } from './websocket/WebSocketServer.js';
 import {
   TerminalMode,
-  getOptimalGrid
+  getOptimalGrid,
+  SessionProfile
 } from './types/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -153,6 +155,138 @@ app.get('/api/health', (req, res) => {
     version: '1.0.0',
     sessions: sessionManager.getSessionCount()
   });
+});
+
+// ========== Profile API ==========
+
+// Get all profiles
+app.get('/api/profiles', (req, res) => {
+  res.json(profileManager.getProfiles());
+});
+
+// Get profiles for a specific mode
+app.get('/api/profiles/mode/:mode', (req, res) => {
+  const mode = req.params.mode as TerminalMode;
+  res.json(profileManager.getProfilesForMode(mode));
+});
+
+// Get single profile
+app.get('/api/profiles/:id', (req, res) => {
+  const profile = profileManager.getProfile(req.params.id);
+  if (!profile) {
+    return res.status(404).json({ error: 'Profile not found' });
+  }
+  res.json(profile);
+});
+
+// Create new profile
+app.post('/api/profiles', (req, res) => {
+  try {
+    const profileData = req.body as Omit<SessionProfile, 'id' | 'createdAt' | 'updatedAt'>;
+    const profile = profileManager.createProfile(profileData);
+    res.status(201).json(profile);
+  } catch (error) {
+    res.status(400).json({ error: 'Failed to create profile' });
+  }
+});
+
+// Update profile
+app.put('/api/profiles/:id', (req, res) => {
+  const updated = profileManager.updateProfile(req.params.id, req.body);
+  if (!updated) {
+    return res.status(404).json({ error: 'Profile not found' });
+  }
+  res.json(updated);
+});
+
+// Delete profile
+app.delete('/api/profiles/:id', (req, res) => {
+  const deleted = profileManager.deleteProfile(req.params.id);
+  if (!deleted) {
+    return res.status(400).json({ error: 'Cannot delete profile (may be default)' });
+  }
+  res.status(204).send();
+});
+
+// Set default profile
+app.post('/api/profiles/:id/default', (req, res) => {
+  const success = profileManager.setDefaultProfile(req.params.id);
+  if (!success) {
+    return res.status(404).json({ error: 'Profile not found' });
+  }
+  res.json({ success: true });
+});
+
+// ========== Session Settings API ==========
+
+// Update session permission mode
+app.patch('/api/sessions/:id/permission', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { permissionMode } = req.body;
+  sessionManager.setPermissionMode(id, permissionMode);
+  res.json(sessionManager.getSession(id));
+});
+
+// Update session custom flags
+app.patch('/api/sessions/:id/flags', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { flags } = req.body;
+  sessionManager.setCustomFlags(id, flags);
+  res.json(sessionManager.getSession(id));
+});
+
+// Update session environment variables
+app.patch('/api/sessions/:id/env', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { envVars } = req.body;
+  sessionManager.setEnvVars(id, envVars);
+  res.json(sessionManager.getSession(id));
+});
+
+// Update session wrapper command
+app.patch('/api/sessions/:id/wrapper', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { wrapper } = req.body;
+  sessionManager.setWrapperCommand(id, wrapper);
+  res.json(sessionManager.getSession(id));
+});
+
+// Update session working directory
+app.patch('/api/sessions/:id/directory', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { directory } = req.body;
+  sessionManager.setWorkingDirectory(id, directory);
+  res.json(sessionManager.getSession(id));
+});
+
+// Apply profile to session
+app.post('/api/sessions/:id/apply-profile', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { profileId } = req.body;
+  const profile = profileManager.getProfile(profileId);
+  if (!profile) {
+    return res.status(404).json({ error: 'Profile not found' });
+  }
+  sessionManager.applyProfile(id, profile);
+  res.json(sessionManager.getSession(id));
+});
+
+// ========== Directory Browser API ==========
+
+// Get allowed directories
+app.get('/api/directories/allowed', (req, res) => {
+  res.json(profileManager.getAllowedDirectories());
+});
+
+// List directory contents
+app.get('/api/directories', (req, res) => {
+  const dirPath = req.query.path as string || '/workspace';
+  try {
+    const entries = profileManager.listDirectory(dirPath);
+    res.json({ path: dirPath, entries });
+  } catch (error: any) {
+    res.status(403).json({ error: error.message || 'Access denied' });
+  }
 });
 
 // SPA fallback - serve index.html for client-side routing

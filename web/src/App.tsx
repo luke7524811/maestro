@@ -12,15 +12,18 @@ import {
   Minus,
   Wifi,
   WifiOff,
-  Circle
+  Circle,
+  Settings
 } from 'lucide-react';
 import { useWebSocket } from './hooks/useWebSocket';
 import { SessionCard, writeToSession } from './components/SessionCard';
+import { SessionSettings } from './components/SessionSettings';
 import {
   SessionInfo,
   SessionStatus,
   SessionStatusConfig,
   TerminalMode,
+  TerminalModeConfig,
   AppState,
   GridConfiguration
 } from './types';
@@ -59,6 +62,7 @@ const App: React.FC = () => {
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [projectPath, setProjectPath] = useState<string>('');
   const [isRunning, setIsRunning] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
   const terminalWritersRef = useRef<Map<number, (data: string) => void>>(new Map());
 
   const {
@@ -134,6 +138,85 @@ const App: React.FC = () => {
       s.id === sessionId ? { ...s, mode } : s
     ));
   }, [setSessionMode]);
+
+  // Handle settings update
+  const handleUpdateSettings = useCallback(async (sessionId: number, settings: Partial<SessionInfo>) => {
+    // Update local state immediately
+    setSessions(prev => prev.map(s =>
+      s.id === sessionId ? { ...s, ...settings } : s
+    ));
+
+    // Update mode if changed
+    if (settings.mode) {
+      setSessionMode(sessionId, settings.mode);
+    }
+
+    // Update other settings via API
+    try {
+      if (settings.permissionMode !== undefined) {
+        await fetch(`/api/sessions/${sessionId}/permission`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ permissionMode: settings.permissionMode })
+        });
+      }
+      if (settings.workingDirectory !== undefined) {
+        await fetch(`/api/sessions/${sessionId}/directory`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ directory: settings.workingDirectory })
+        });
+      }
+      if (settings.customFlags !== undefined) {
+        await fetch(`/api/sessions/${sessionId}/flags`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ flags: settings.customFlags })
+        });
+      }
+      if (settings.envVars !== undefined) {
+        await fetch(`/api/sessions/${sessionId}/env`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ envVars: settings.envVars })
+        });
+      }
+      if (settings.wrapperCommand !== undefined) {
+        await fetch(`/api/sessions/${sessionId}/wrapper`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wrapper: settings.wrapperCommand })
+        });
+      }
+    } catch (error) {
+      console.error('Failed to update session settings:', error);
+    }
+  }, [setSessionMode]);
+
+  // Handle save as profile
+  const handleSaveAsProfile = useCallback(async (sessionId: number, name: string) => {
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session) return;
+
+    try {
+      await fetch('/api/profiles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          mode: session.mode,
+          permissionMode: session.permissionMode,
+          workingDirectory: session.workingDirectory,
+          customFlags: session.customFlags,
+          envVars: session.envVars,
+          wrapperCommand: session.wrapperCommand,
+          isDefault: false
+        })
+      });
+    } catch (error) {
+      console.error('Failed to save profile:', error);
+    }
+  }, [sessions]);
 
   // Handle add session
   const handleAddSession = useCallback(() => {
@@ -243,6 +326,8 @@ const App: React.FC = () => {
                 onInput={handleInput}
                 onResize={handleResize}
                 onSetMode={handleSetMode}
+                onUpdateSettings={handleUpdateSettings}
+                onSaveAsProfile={handleSaveAsProfile}
               />
             ))}
           </div>
@@ -283,19 +368,39 @@ const App: React.FC = () => {
                   }}
                 >
                   {sessions.map(session => {
-                    const config = SessionStatusConfig[session.status];
+                    const modeConfig = TerminalModeConfig[session.mode];
                     return (
                       <div
                         key={session.id}
-                        className="w-24 h-20 rounded-lg flex flex-col items-center justify-center"
+                        className="w-32 h-24 rounded-lg flex flex-col p-2 relative group"
                         style={{
-                          backgroundColor: `${config.color}33`,
+                          backgroundColor: `${modeConfig.color}1a`,
                           borderWidth: 2,
-                          borderColor: config.color
+                          borderColor: modeConfig.color
                         }}
                       >
-                        <span className="text-lg font-bold">#{session.id}</span>
-                        <span className="text-xs opacity-70">{config.label}</span>
+                        {/* Settings button (visible on hover) */}
+                        <button
+                          onClick={() => setEditingSessionId(session.id)}
+                          className="absolute top-1 right-1 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-ctp-surface0/50 transition-opacity"
+                          title="Configure session"
+                        >
+                          <Settings className="w-3 h-3 text-ctp-subtext0" />
+                        </button>
+
+                        <div className="flex-1 flex flex-col items-center justify-center">
+                          <span className="text-sm font-bold" style={{ color: modeConfig.color }}>
+                            {modeConfig.shortLabel}
+                          </span>
+                          <span className="text-xs text-ctp-subtext0">#{session.id}</span>
+                        </div>
+
+                        {/* Show permission mode if not default */}
+                        {session.permissionMode && session.permissionMode !== 'default' && (
+                          <div className="text-[10px] text-center text-ctp-subtext0 truncate">
+                            {session.permissionMode}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -362,6 +467,19 @@ const App: React.FC = () => {
           </button>
         )}
       </footer>
+
+      {/* Settings modal for pre-launch editing */}
+      {editingSessionId !== null && (
+        <SessionSettings
+          session={sessions.find(s => s.id === editingSessionId)!}
+          onClose={() => setEditingSessionId(null)}
+          onSave={(settings) => {
+            handleUpdateSettings(editingSessionId, settings);
+            setEditingSessionId(null);
+          }}
+          onSaveAsProfile={(name) => handleSaveAsProfile(editingSessionId, name)}
+        />
+      )}
     </div>
   );
 };
