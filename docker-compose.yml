@@ -20,13 +20,13 @@ services:
       # - OPENAI_API_KEY=your-key-here
     volumes:
       # Mount workspace for projects
-      - /mnt/user/appdata/maestro-workspace:/workspace:rw
+      - ./workspace:/workspace:rw
       # Mount CLI config directories for persistent authentication
-      - /mnt/user/appdata/maestro-config/claude:/root/.claude:rw
-      - /mnt/user/appdata/maestro-config/gemini:/root/.config/gemini:rw
-      - /mnt/user/appdata/maestro-config/codex:/root/.codex:rw
-      # SSH keys for git operations
-      - /root/.ssh:/root/.ssh:ro
+      - ./config/claude:/root/.claude:rw
+      - ./config/gemini:/root/.config/gemini:rw
+      - ./config/codex:/root/.codex:rw
+      # SSH keys for git operations (optional)
+      - ~/.ssh:/root/.ssh:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3100/api/health"]
       interval: 30s
@@ -53,6 +53,6 @@ services:
     volumes:
       - ./server/src:/app/server/src:ro
       - ./web/src:/app/web/src:ro
-      - /mnt/user/appdata/maestro-workspace:/workspace:rw
+      - ./workspace:/workspace:rw
     profiles:
       - dev

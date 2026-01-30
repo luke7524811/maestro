@@ -14,3 +14,15 @@ claude.md
 
 # Local MCP configuration (contains machine-specific paths)
 .mcp.json
+
+# Web port artifacts
+node_modules/
+dist/
+server/dist/
+web/dist/
+*.log
+
+# Local development
+SESSION-LOG.md
+workspace/
+config/
