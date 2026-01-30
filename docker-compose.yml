@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  maestro-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: maestro-web
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    environment:
+      - NODE_ENV=production
+      - PORT=3100
+      - DEFAULT_SESSIONS=0
+      - PROJECT_PATH=/workspace
+      # API keys for CLI authentication (optional - can also use interactive login)
+      # - ANTHROPIC_API_KEY=your-key-here
+      # - GEMINI_API_KEY=your-key-here
+      # - OPENAI_API_KEY=your-key-here
+    volumes:
+      # Mount workspace for projects
+      - /mnt/user/appdata/maestro-workspace:/workspace:rw
+      # Mount CLI config directories for persistent authentication
+      - /mnt/user/appdata/maestro-config/claude:/root/.claude:rw
+      - /mnt/user/appdata/maestro-config/gemini:/root/.config/gemini:rw
+      - /mnt/user/appdata/maestro-config/codex:/root/.codex:rw
+      # SSH keys for git operations
+      - /root/.ssh:/root/.ssh:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3100/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "com.docker.compose.project=maestro-web"
+
+# Alternative: Development mode with hot reload
+  maestro-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: maestro-dev
+    ports:
+      - "3100:3100"
+      - "3000:3000"  # Vite dev server
+    environment:
+      - NODE_ENV=development
+      - PORT=3100
+      - DEFAULT_SESSIONS=6
+      - PROJECT_PATH=/workspace
+    volumes:
+      - ./server/src:/app/server/src:ro
+      - ./web/src:/app/web/src:ro
+      - /mnt/user/appdata/maestro-workspace:/workspace:rw
+    profiles:
+      - dev
