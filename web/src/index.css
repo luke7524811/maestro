@@ -37,6 +37,7 @@ html, body, #root {
   width: 100%;
   height: 100%;
   position: relative;
+  overflow: hidden;
 }
 
 .terminal-container .xterm {
@@ -49,8 +50,32 @@ html, body, #root {
 }
 
 .terminal-container .xterm-viewport {
-  overflow-y: scroll !important;
+  /* Enable scrolling with smooth behavior */
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
   scrollbar-width: thin;
+  scrollbar-color: #585b70 #1e1e2e;
+  /* Ensure scroll area fills container */
+  height: 100% !important;
+}
+
+/* WebKit scrollbar styling for terminal */
+.terminal-container .xterm-viewport::-webkit-scrollbar {
+  width: 8px;
+}
+
+.terminal-container .xterm-viewport::-webkit-scrollbar-track {
+  background: #1e1e2e;
+  border-radius: 4px;
+}
+
+.terminal-container .xterm-viewport::-webkit-scrollbar-thumb {
+  background: #45475a;
+  border-radius: 4px;
+}
+
+.terminal-container .xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: #585b70;
 }
 
 /* Ensure terminal viewport can scroll to bottom */
@@ -58,10 +83,20 @@ html, body, #root {
   position: relative;
 }
 
+/* Smooth scrolling for terminal */
+.terminal-container .xterm-viewport {
+  scroll-behavior: smooth;
+}
+
 /* Session card */
 .session-card {
-  @apply rounded-lg border-2 overflow-hidden flex flex-col;
-  min-height: 200px;
+  @apply rounded-lg border-2 flex flex-col;
+  /* Use overflow hidden to constrain content within grid cell */
+  overflow: hidden;
+  /* Minimum height for standalone view, but allow shrinking in grid */
+  min-height: 0;
+  /* Ensure card fills its grid cell */
+  height: 100%;
 }
 
 /* Status pulse animation */
@@ -72,4 +107,29 @@ html, body, #root {
 
 .status-working {
   animation: pulse-border 2s infinite;
+}
+
+/* Focus indicator animation */
+@keyframes focus-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 1px rgba(137, 180, 250, 0.3), 0 0 8px rgba(137, 180, 250, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(137, 180, 250, 0.5), 0 0 12px rgba(137, 180, 250, 0.4);
+  }
+}
+
+.session-focused {
+  animation: focus-glow 2s infinite;
+  transition: all 0.2s ease-in-out;
+}
+
+/* Enhanced focus styles */
+.session-focused .terminal-container {
+  background: rgba(137, 180, 250, 0.02);
+}
+
+/* Focus indicator in header */
+.session-focused .flex.items-center.gap-2.px-2.py-1 {
+  background: rgba(137, 180, 250, 0.15) !important;
 }

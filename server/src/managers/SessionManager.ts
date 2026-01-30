@@ -17,6 +17,7 @@ import {
   SessionProfile
 } from '../types/index.js';
 import { profileManager } from './ProfileManager.js';
+import { sessionPersistenceManager } from './SessionPersistenceManager.js';
 
 interface TerminalSession {
   info: SessionInfo;
@@ -55,11 +56,96 @@ export class SessionManager extends EventEmitter {
   private projectPath: string = '';
   private defaultShell: string;
   private isRunning: boolean = false;
+  private persistenceEnabled: boolean = true;
+  private saveTimer: NodeJS.Timeout | null = null;
 
   constructor() {
     super();
     // Detect shell - matches Swift ProcessInfo.processInfo.environment["SHELL"]
     this.defaultShell = process.env.SHELL || '/bin/bash';
+
+    // Restore sessions from previous run if persistence enabled
+    this.restoreSessionsFromSnapshots();
+
+    // Set up periodic session state saving
+    this.startPeriodicSave();
+
+    // Handle graceful shutdown
+    process.on('SIGINT', () => this.saveAllSessionStates());
+    process.on('SIGTERM', () => this.saveAllSessionStates());
+  }
+
+  // Restore sessions from snapshots on startup
+  private restoreSessionsFromSnapshots(): void {
+    if (!this.persistenceEnabled) return;
+
+    try {
+      const snapshots = sessionPersistenceManager.getSessionsToRestore();
+      console.log(`Found ${snapshots.length} session snapshots to restore`);
+
+      for (const snapshot of snapshots) {
+        // Use the snapshot's original ID if possible, otherwise assign new ID
+        const sessionId = this.getNextAvailableId(snapshot.id);
+        const restoredInfo = sessionPersistenceManager.restoreSession(snapshot, sessionId);
+
+        const session: TerminalSession = {
+          info: restoredInfo,
+          pty: null,
+          outputBuffer: '',
+          lastOutputTime: null,
+          idleTimer: null,
+          initTimer: null
+        };
+
+        this.sessions.set(sessionId, session);
+        this.nextSessionId = Math.max(this.nextSessionId, sessionId + 1);
+
+        console.log(`Restored session ${sessionId} (mode: ${restoredInfo.mode}, cwd: ${restoredInfo.workingDirectory})`);
+      }
+
+      if (snapshots.length > 0) {
+        this.emit('sessionsRestored', snapshots.length);
+      }
+    } catch (error) {
+      console.error('Failed to restore sessions from snapshots:', error);
+    }
+  }
+
+  // Get next available session ID, preferring the suggested ID if available
+  private getNextAvailableId(suggestedId: number): number {
+    if (!this.sessions.has(suggestedId) && suggestedId >= this.nextSessionId) {
+      return suggestedId;
+    }
+    return this.nextSessionId++;
+  }
+
+  // Start periodic session state saving
+  private startPeriodicSave(): void {
+    if (!this.persistenceEnabled) return;
+
+    // Save session states every 30 seconds
+    this.saveTimer = setInterval(() => {
+      this.saveAllSessionStates();
+    }, 30000);
+  }
+
+  // Save current state of all sessions
+  private saveAllSessionStates(): void {
+    if (!this.persistenceEnabled) return;
+
+    for (const [sessionId, session] of this.sessions) {
+      if (session.info.isTerminalLaunched && session.pty) {
+        // Get current working directory from PTY if available
+        const ptyState = {
+          cwd: session.info.workingDirectory,
+          environment: {} as Record<string, string> // Simplified - env vars are session-specific
+        };
+        sessionPersistenceManager.saveSessionState(session.info, ptyState);
+      } else {
+        // Save configuration even if not launched
+        sessionPersistenceManager.saveSessionState(session.info);
+      }
+    }
   }
 
   // Get all sessions - matches Swift sessions array
@@ -97,6 +183,54 @@ export class SessionManager extends EventEmitter {
     this.sessions.set(id, session);
     this.emit('sessionCreated', session.info);
     return session.info;
+  }
+
+  // Duplicate an existing session (copies configuration but not runtime state)
+  duplicateSession(sessionId: number): SessionInfo | null {
+    const sourceSession = this.sessions.get(sessionId);
+    if (!sourceSession) return null;
+
+    const id = this.nextSessionId++;
+    const sourceInfo = sourceSession.info;
+
+    // Create new session with copied configuration
+    const newSession: TerminalSession = {
+      info: {
+        ...createSession(id, sourceInfo.mode),
+        // Copy configuration from source
+        name: sourceInfo.name ? `${sourceInfo.name} (copy)` : null,
+        mode: sourceInfo.mode,
+        assignedBranch: sourceInfo.assignedBranch,
+        workingDirectory: sourceInfo.workingDirectory,
+        profileId: sourceInfo.profileId,
+        permissionMode: sourceInfo.permissionMode,
+        customFlags: [...sourceInfo.customFlags],
+        envVars: { ...sourceInfo.envVars },
+        wrapperCommand: sourceInfo.wrapperCommand,
+        customRunCommand: sourceInfo.customRunCommand,
+        // Reset runtime state - new session starts fresh
+        status: SessionStatus.Idle,
+        shouldLaunchTerminal: false,
+        isTerminalLaunched: false,
+        isClaudeRunning: false,
+        isVisible: true,
+        terminalPid: null,
+        assignedPort: null,
+        isAppRunning: false,
+        serverURL: null,
+        errorMessage: null,
+        lastOutput: null
+      },
+      pty: null,
+      outputBuffer: '',
+      lastOutputTime: null,
+      idleTimer: null,
+      initTimer: null
+    };
+
+    this.sessions.set(id, newSession);
+    this.emit('sessionCreated', newSession.info);
+    return newSession.info;
   }
 
   // Initialize with default sessions - matches Swift init with 6 sessions
@@ -424,11 +558,22 @@ export class SessionManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session?.pty) return;
     session.pty.write(data);
+
+    // Track command history for persistence (if it ends with \r it's a command)
+    if (this.persistenceEnabled && data.endsWith('\r')) {
+      const command = data.slice(0, -1); // Remove \r
+      sessionPersistenceManager.addToHistory(sessionId, command);
+    }
   }
 
   // Send command with carriage return - matches Swift Coordinator.sendCommand
   sendCommand(sessionId: number, command: string): void {
     this.sendInput(sessionId, command + '\r');
+
+    // Explicitly track this as a command for persistence
+    if (this.persistenceEnabled) {
+      sessionPersistenceManager.addToHistory(sessionId, command);
+    }
   }
 
   // Resize terminal - matches Swift sizeChanged
@@ -455,6 +600,14 @@ export class SessionManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session) return;
     session.info.assignedBranch = branch;
+    this.emit('sessionStatusUpdate', session.info);
+  }
+
+  // Set session name/label - can be changed anytime
+  setSessionName(sessionId: number, name: string | null): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    session.info.name = name;
     this.emit('sessionStatusUpdate', session.info);
   }
 
@@ -520,6 +673,19 @@ export class SessionManager extends EventEmitter {
   closeSession(sessionId: number): void {
     const session = this.sessions.get(sessionId);
     if (!session) return;
+
+    // Save final state before closing if persistence enabled
+    if (this.persistenceEnabled) {
+      if (session.info.isTerminalLaunched && session.pty) {
+        const ptyState = {
+          cwd: session.info.workingDirectory,
+          environment: {} as Record<string, string>
+        };
+        sessionPersistenceManager.saveSessionState(session.info, ptyState);
+      } else {
+        sessionPersistenceManager.saveSessionState(session.info);
+      }
+    }
 
     // Clear timers
     if (session.idleTimer) clearTimeout(session.idleTimer);
@@ -589,6 +755,75 @@ export class SessionManager extends EventEmitter {
     }
 
     return summary;
+  }
+
+  // Session persistence management
+  setPersistenceEnabled(enabled: boolean): void {
+    this.persistenceEnabled = enabled;
+
+    if (enabled && !this.saveTimer) {
+      this.startPeriodicSave();
+    } else if (!enabled && this.saveTimer) {
+      clearInterval(this.saveTimer);
+      this.saveTimer = null;
+    }
+  }
+
+  isPersistenceEnabled(): boolean {
+    return this.persistenceEnabled;
+  }
+
+  // Force save all session states
+  forceSaveState(): void {
+    this.saveAllSessionStates();
+  }
+
+  // Get command history for a session
+  getSessionHistory(sessionId: number): string[] {
+    return sessionPersistenceManager.getHistory(sessionId);
+  }
+
+  // Clear persistence data for a session
+  clearSessionPersistenceData(sessionId: number): void {
+    sessionPersistenceManager.clearSessionSnapshots(sessionId);
+  }
+
+  // Get persistence statistics
+  getPersistenceStats(): any {
+    return sessionPersistenceManager.getStats();
+  }
+
+  // Manual session restore from snapshots (for admin/debug)
+  restoreSessionFromSnapshot(snapshotId: number): SessionInfo | null {
+    const snapshot = sessionPersistenceManager.getSnapshot(snapshotId);
+    if (!snapshot) return null;
+
+    const sessionId = this.nextSessionId++;
+    const restoredInfo = sessionPersistenceManager.restoreSession(snapshot, sessionId);
+
+    const session: TerminalSession = {
+      info: restoredInfo,
+      pty: null,
+      outputBuffer: '',
+      lastOutputTime: null,
+      idleTimer: null,
+      initTimer: null
+    };
+
+    this.sessions.set(sessionId, session);
+    this.emit('sessionCreated', session.info);
+    return restoredInfo;
+  }
+
+  // Cleanup - stop all timers and save state
+  shutdown(): void {
+    if (this.saveTimer) {
+      clearInterval(this.saveTimer);
+      this.saveTimer = null;
+    }
+
+    this.saveAllSessionStates();
+    this.closeAllSessions();
   }
 }
 

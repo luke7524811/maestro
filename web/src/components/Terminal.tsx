@@ -12,6 +12,7 @@ interface TerminalProps {
   sessionId: number;
   onData: (data: string) => void;
   onResize: (cols: number, rows: number) => void;
+  onFocus?: () => void;
 }
 
 // Global registry for terminal write functions - more reliable than DOM queries
@@ -81,7 +82,8 @@ const CATPPUCCIN_THEME = {
 export const Terminal: React.FC<TerminalProps> = ({
   sessionId,
   onData,
-  onResize
+  onResize,
+  onFocus
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<XTerm | null>(null);
@@ -216,8 +218,12 @@ export const Terminal: React.FC<TerminalProps> = ({
   const handleClick = useCallback(() => {
     if (terminalRef.current && !isDisposedRef.current) {
       terminalRef.current.focus();
+      // Notify parent about focus change
+      if (onFocus) {
+        onFocus();
+      }
     }
-  }, []);
+  }, [onFocus]);
 
   return (
     <div

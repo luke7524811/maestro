@@ -1,104 +1,333 @@
-# Maestro
+# Maestro Web
 
-<!-- Add your banner: save as assets/banner.png -->
-![Claude Maestro Banner](assets/banner.png)
+🌐 **Web-based port of [Claude Maestro](https://github.com/its-maestro-baby/maestro)** - Orchestrate multiple AI coding assistants in parallel from your browser.
 
-**Orchestrate multiple AI coding assistants in parallel**
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue?logo=docker)](https://docker.com)
+[![Node.js](https://img.shields.io/badge/Node.js-20-green?logo=node.js)](https://nodejs.org)
+[![React](https://img.shields.io/badge/React-18-blue?logo=react)](https://reactjs.org)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-A native macOS application that lets you run 1-12 Claude Code (or other AI CLI) sessions simultaneously, each in its own isolated git worktree.
-
-![macOS](https://img.shields.io/badge/macOS-14%2B-blue)
-![Swift](https://img.shields.io/badge/Swift-6.0-orange)
-![License](https://img.shields.io/badge/license-MIT-green)
-[![X (Twitter)](https://img.shields.io/badge/X-@maestro5240871-000000?style=flat&logo=x&logoColor=white)](https://x.com/maestro5240871)
-[![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?style=flat&logo=discord&logoColor=white)](https://discord.gg/3tQyFUYPVP)
-
-⭐ **Star us on GitHub — your support motivates us a lot!** 🙏😊
+![Maestro Web Interface](assets/banner.png)
 
 ---
 
-## 📖 Table of Contents
+## 🎯 Why Maestro Web?
 
-- [🎯 Why Maestro?](#-why-maestro)
-- [✨ Features](#-features)
-- [🏗️ Architecture](#️-architecture)
-- [📦 Installation](#-installation)
-- [🚀 Usage](#-usage)
-- [⚙️ Configuration](#️-configuration)
-- [🔧 Troubleshooting](#-troubleshooting)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
-- [🙏 Acknowledgments](#-acknowledgments)
+**The Problem:** AI coding assistants work on one task at a time. While Claude works on Feature A, you wait. Then you start Feature B. Then you wait again. Development velocity is bottlenecked by serial execution.
 
----
+**The Solution:** Run 1-12 AI sessions in parallel, each with its own terminal. Work on multiple features, bug fixes, and refactoring simultaneously from any device with a browser.
 
-## 🎯 Why Maestro?
+### Key Benefits
 
-**The Problem:** AI coding assistants work on one task at a time. While Claude works on Feature A, you wait. Then you start Feature B. Then you wait again. Context switching is expensive, and your development velocity is bottlenecked by serial execution.
-
-**The Solution:** Run multiple AI sessions in parallel. Each session gets its own:
-- Terminal instance with full shell environment
-- Git worktree for complete code isolation
-- Assigned branch for focused work
-- Port allocation for web development
-
-### Core Principles
-
-| Principle | Description |
-|-----------|-------------|
-| **Parallel Development** | Launch 1-12 AI sessions simultaneously. Work on feature branches, bug fixes, and refactoring all at once. |
-| **True Isolation** | Each session operates in its own git worktree. No merge conflicts, no stepping on each other's changes. |
-| **AI-Native Workflow** | Built specifically for Claude Code, Gemini CLI, OpenAI Codex, and other AI coding assistants. |
+| Benefit | Description |
+|---------|-------------|
+| **Cross-Platform** | Works on any OS - Windows, Mac, Linux, even tablets via browser |
+| **Parallel Development** | Run multiple AI coding assistants simultaneously |
+| **Docker Deployment** | Self-hosted, secure, no data leaves your infrastructure |
+| **Persistent Sessions** | Credentials and configurations survive restarts |
+| **Terminal Multiplexing** | Full terminal emulation with xterm.js |
 
 ---
 
 ## ✨ Features
 
-### Multi-Terminal Session Grid
-- Dynamic grid layout (1x1 to 3x4) that adapts to your session count
-- Real-time status indicators: idle, working, waiting for input, done, error
-- Per-session mode selection (Claude Code, Gemini CLI, OpenAI Codex, Plain Terminal)
+### 🖥️ Multi-Terminal Session Grid
+- **Dynamic grid layout** (1x1 to 3x4) adapts to session count
+- **Real-time status indicators**: Initializing, Working, Waiting, Done, Error
+- **Visual focus indicator** shows which terminal is active
+- **Easy session switching** via click or keyboard shortcuts
 
-### Git Worktree Isolation
-- Automatic worktree creation at `~/.claude-maestro/worktrees/`
-- Each session works on its own branch without conflicts
-- Worktrees are pruned on session close
-- Visual branch assignment in the sidebar
+### 🤖 Multi-AI Support
+| AI Assistant | Command | Description |
+|--------------|---------|-------------|
+| **Claude Code** | `claude` | Anthropic's flagship coding assistant |
+| **Gemini CLI** | `gemini` | Google's Gemini AI for code |
+| **OpenAI Codex** | `codex` | OpenAI's coding assistant |
+| **Plain Terminal** | `bash` | Standard shell for any task |
 
-### MCP Server Integration
-- Built-in MCP server for agent status reporting
-- AI sessions report their state (idle, working, needs input, finished, error)
-- Real-time status updates displayed in the session grid
-- Uses the `maestro_status` tool for state communication
+### ⚙️ Advanced Session Configuration
+- **Permission modes** - Control AI behavior (`--dangerously-skip-permissions`, `--plan`, etc.)
+- **Custom flags** - Add any CLI arguments per session
+- **Environment variables** - Inject custom env vars per session
+- **Guardrails** - System prompts for all AI sessions
+- **Working directories** - Different project paths per session
 
-### Visual Git Graph
-- GitKraken-style commit visualization
-- Branch relationship view with colored rails
-- Commit detail panel with diffs
-- See which sessions are working on which branches
+### 💾 Persistent Configuration
+- **Session profiles** - Save and reuse session configurations
+- **Favorite paths** - Quick directory selection for new sessions
+- **Allowed directories** - Security boundaries for file browser
+- **Credential storage** - OAuth tokens and API keys persist across restarts
 
-### Template Presets
-- Save session configurations (modes, branches, count)
-- Quickly load common workflows
-- Persist across app restarts
+### 🛡️ Security & Isolation
+- **Allowed directory boundaries** - Restrict file system access
+- **Docker container isolation** - AI sessions run in isolated environment
+- **No telemetry** - All data stays on your infrastructure
+- **Volume-based persistence** - Credentials stored in Docker volumes
 
-### Quick Actions
-- Custom action buttons per session
-- "Run App", "Commit & Push", and custom prompts
-- Execute commands via AI assistant
+---
 
-### Multi-AI Support
-- **Claude Code** - Anthropic's Claude in the terminal
-- **Gemini CLI** - Google's Gemini AI
-- **OpenAI Codex** - OpenAI's coding assistant
-- **Plain Terminal** - Standard shell without AI
+## 🚀 Quick Start
 
-### Plugin Marketplace
-- Browse and install plugins from marketplace sources
-- Plugin types: Skills, Commands, and MCP servers
-- Per-session plugin configuration
-- Automatic symlink management for commands and skills
-- Extend Maestro's capabilities with community plugins
+### Prerequisites
+- [Docker](https://docker.com) installed
+- Modern web browser (Chrome, Firefox, Safari, Edge)
+
+### Option 1: Docker Run (Fastest)
+
+```bash
+# Create directories for persistent storage
+mkdir -p ./config/{maestro,claude,gemini,codex} ./workspace
+
+# Run Maestro Web
+docker run -d \
+  --name maestro-web \
+  -p 3100:3100 \
+  -v "$PWD/workspace:/workspace:rw" \
+  -v "$PWD/config/maestro:/app/config:rw" \
+  -v "$PWD/config/claude:/root/.claude:rw" \
+  -v "$PWD/config/gemini:/root/.config/gemini:rw" \
+  -v "$PWD/config/codex:/root/.codex:rw" \
+  -v "$HOME/.ssh:/root/.ssh:ro" \
+  maestro-web:latest
+
+# Access at http://localhost:3100
+```
+
+### Option 2: Docker Compose (Recommended)
+
+```bash
+git clone https://github.com/luke7524811/maestro.git
+cd maestro
+docker-compose up -d maestro-web
+
+# Access at http://localhost:3100
+```
+
+### Option 3: Build from Source
+
+```bash
+git clone https://github.com/luke7524811/maestro.git
+cd maestro
+
+# Build the image
+docker build -t maestro-web .
+
+# Run with compose
+docker-compose up -d maestro-web
+```
+
+---
+
+## 🔐 Authentication Setup
+
+### First-Time Authentication
+
+1. **Open Maestro Web** at http://localhost:3100
+2. **Create a Plain Terminal session** (click + button, select "Plain Terminal")
+3. **Launch the session** and authenticate each AI CLI:
+
+#### Claude Code Authentication
+```bash
+# In the Plain Terminal session:
+claude
+
+# Follow OAuth flow - opens browser to authenticate with Anthropic
+# Credentials stored in /root/.claude/ (persisted via volume mount)
+```
+
+#### Gemini CLI Authentication
+```bash
+# In the Plain Terminal session:
+gemini
+
+# Follow OAuth flow - authenticates with Google account
+# Credentials stored in /root/.config/gemini/ (persisted via volume mount)
+```
+
+#### OpenAI Codex Authentication
+```bash
+# In the Plain Terminal session:
+codex
+
+# Enter OpenAI API key when prompted
+# Credentials stored in /root/.codex/ (persisted via volume mount)
+```
+
+### Alternative: API Key Environment Variables
+
+Set API keys directly in `docker-compose.yml`:
+
+```yaml
+environment:
+  - ANTHROPIC_API_KEY=sk-ant-your-key-here
+  - GEMINI_API_KEY=your-gemini-key-here
+  - OPENAI_API_KEY=sk-your-openai-key-here
+```
+
+---
+
+## 📖 Usage Guide
+
+### Creating & Managing Sessions
+
+1. **Add sessions**: Click the `+` button in the header
+2. **Configure session**:
+   - Choose AI mode (Claude Code, Gemini CLI, etc.)
+   - Set working directory (or use favorites)
+   - Configure permission mode for Claude
+   - Add custom flags if needed
+3. **Launch session**: Click the Launch button
+4. **Switch focus**: Click on any terminal or use keyboard shortcuts
+
+### Session Profiles
+
+**Save frequently-used configurations:**
+1. Configure a session with your preferred settings
+2. Click "Save Profile" in session settings
+3. Name your profile (e.g., "React Development", "Python Analysis")
+4. Apply saved profiles to new sessions instantly
+
+### Working with Projects
+
+**Set up a development workspace:**
+1. Use "Add Directory" to allow access to your project folders
+2. Add frequently-used paths to "Favorites" for quick selection
+3. Set different working directories per session for multi-repo work
+4. Use guardrails to provide project context to all AI sessions
+
+### Terminal Features
+
+| Feature | Description |
+|---------|-------------|
+| **Full terminal emulation** | Copy/paste, scrollback, colors, cursor navigation |
+| **Auto-scroll** | Automatically follows output to bottom |
+| **Resize support** | Terminals adapt to container size changes |
+| **Focus management** | Clear visual indication of active terminal |
+
+---
+
+## ⚙️ Configuration
+
+### Docker Compose Configuration
+
+```yaml
+version: '3.8'
+
+services:
+  maestro-web:
+    build: .
+    container_name: maestro-web
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    environment:
+      - NODE_ENV=production
+      - PORT=3100
+      - DEFAULT_SESSIONS=0
+      - PROJECT_PATH=/workspace
+      # Optional: API keys for non-interactive auth
+      # - ANTHROPIC_API_KEY=your-key-here
+      # - GEMINI_API_KEY=your-key-here
+      # - OPENAI_API_KEY=your-key-here
+    volumes:
+      # Mount workspace for projects
+      - ./workspace:/workspace:rw
+      # Persist Maestro config (profiles, allowed directories, favorites, guardrails)
+      - ./config/maestro:/app/config:rw
+      # Mount CLI config directories for persistent authentication
+      - ./config/claude:/root/.claude:rw
+      - ./config/gemini:/root/.config/gemini:rw
+      - ./config/codex:/root/.codex:rw
+      # SSH keys for git operations (optional)
+      - ~/.ssh:/root/.ssh:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3100/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NODE_ENV` | production | Runtime environment |
+| `PORT` | 3100 | HTTP server port |
+| `DEFAULT_SESSIONS` | 0 | Sessions to create on startup |
+| `PROJECT_PATH` | /workspace | Default working directory |
+| `ANTHROPIC_API_KEY` | - | Claude Code API key (optional) |
+| `GEMINI_API_KEY` | - | Gemini CLI API key (optional) |
+| `OPENAI_API_KEY` | - | OpenAI Codex API key (optional) |
+
+### Volume Mounts
+
+| Volume | Purpose | Permissions |
+|--------|---------|-------------|
+| `./workspace:/workspace` | Project files and code | Read/Write |
+| `./config/maestro:/app/config` | Maestro settings, profiles, favorites | Read/Write |
+| `./config/claude:/root/.claude` | Claude CLI credentials | Read/Write |
+| `./config/gemini:/root/.config/gemini` | Gemini CLI credentials | Read/Write |
+| `./config/codex:/root/.codex` | Codex CLI credentials | Read/Write |
+| `~/.ssh:/root/.ssh` | SSH keys for git operations | Read Only |
+
+---
+
+## 🔧 API Reference
+
+### Session Management
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/sessions` | GET | List all sessions with status |
+| `/api/sessions` | POST | Create new session |
+| `/api/sessions/:id/launch` | POST | Launch session terminal |
+| `/api/sessions/:id` | DELETE | Close session |
+| `/api/sessions/:id/mode` | PATCH | Change session mode |
+| `/api/sessions/:id/directory` | PATCH | Set working directory |
+
+### Configuration
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/profiles` | GET | List saved profiles |
+| `/api/profiles` | POST | Create new profile |
+| `/api/profiles/:id` | GET/PUT/DELETE | Manage specific profile |
+| `/api/directories/allowed` | GET/POST/DELETE | Manage allowed directories |
+| `/api/directories/favorites` | GET/POST/DELETE | Manage favorite paths |
+| `/api/guardrails` | GET/PUT | System prompt for AI sessions |
+
+### System
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/health` | GET | Health check |
+| `/api/project` | GET/POST | Default project path |
+| `/api/start` | POST | Enter running mode |
+| `/api/stop` | POST | Exit running mode |
+
+### WebSocket Events
+
+Real-time terminal I/O via WebSocket at `/ws`:
+
+| Event | Direction | Description |
+|-------|-----------|-------------|
+| `session:output` | Server → Client | Terminal output data |
+| `session:input` | Client → Server | User input to terminal |
+| `session:statusUpdate` | Server → Client | Status changes |
+| `session:resize` | Client → Server | Terminal resize |
+
+---
+
+## 🎨 Status Indicators
+
+| Color | Status | Meaning |
+|-------|--------|---------|
+| 🟠 Orange | Initializing | Session starting up, loading AI |
+| ⚪ Gray | Idle | Waiting for user input |
+| 🔵 Blue | Working | AI processing request |
+| 🟡 Yellow | Waiting | Needs user input (y/n prompt) |
+| 🟢 Green | Done | Task completed successfully |
+| 🔴 Red | Error | Command failed or AI error |
 
 ---
 
@@ -106,199 +335,198 @@ A native macOS application that lets you run 1-12 Claude Code (or other AI CLI) 
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Claude Maestro (Swift/SwiftUI)               │
+│                    Browser (React + xterm.js)                  │
 │                                                                 │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
 │  │  Session 1   │  │  Session 2   │  │  Session 3   │   ...    │
 │  │ Claude Code  │  │ Gemini CLI   │  │  Terminal    │          │
-│  │ feature/auth │  │ fix/bug-123  │  │    main      │          │
+│  │   Terminal   │  │   Terminal   │  │   Terminal   │          │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘          │
 │         │                 │                 │                   │
-│  ┌──────▼─────────────────▼─────────────────▼───────┐          │
-│  │              WorktreeManager                      │          │
-│  │     ~/.claude-maestro/worktrees/{repo}/{branch}  │          │
-│  └──────────────────────────────────────────────────┘          │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              │ MCP Protocol (stdio)
-                              ▼
+│         └─────────────────┼─────────────────┘                   │
+│                           │ WebSocket (/ws)                     │
+└───────────────────────────┼─────────────────────────────────────┘
+                            │
+                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                  MaestroMCPServer (Swift)                       │
+│                    Node.js Server (Express)                    │
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────────┐│
-│  │                     StatusManager                           ││
-│  │  maestro_status tool - agents report their current state    ││
-│  │  (idle, working, needs_input, finished, error)              ││
+│  │                   SessionManager                            ││
+│  │         node-pty spawns: claude, gemini, codex             ││
+│  │         process monitoring, status detection                ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                   ProfileManager                            ││
+│  │      profiles, favorites, allowed dirs, guardrails         ││
 │  └─────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Technology Stack
 
-| Component | Technology |
-|-----------|------------|
-| Desktop App | Swift 5.9, SwiftUI, AppKit |
-| Terminal Emulator | SwiftTerm |
-| MCP Server | Swift MCP SDK (agent status reporting) |
-| Git Operations | Native git CLI |
+| Layer | Technology |
+|-------|------------|
+| **Frontend** | React 18, TypeScript, Vite |
+| **Terminal** | xterm.js with FitAddon |
+| **Styling** | CSS3, Catppuccin Mocha theme |
+| **Backend** | Node.js 20, Express, WebSocket |
+| **Process Management** | node-pty (PTY spawning) |
+| **Container** | Docker, Alpine Linux |
+| **AI CLIs** | Claude Code, Gemini CLI, OpenAI Codex |
 
 ---
 
-## 📦 Installation
+## 🔍 Troubleshooting
 
-### Requirements
+### Common Issues
 
-- macOS 14 (Sonoma) or later
-- Xcode 15 or later
-- Claude Code CLI (`npm install -g @anthropic-ai/claude-code`)
+#### ❌ CLI Not Found
+```bash
+# Check if CLIs are installed in container
+docker exec maestro-web which claude gemini codex
 
-### Build from Source
+# Rebuild image if CLIs missing
+docker build --no-cache -t maestro-web .
+```
 
-1. **Clone the repository:**
+#### ❌ Authentication Fails
+1. **Use Plain Terminal** mode to authenticate interactively
+2. **Check volume mounts** have `:rw` permissions
+3. **Verify credentials exist**:
    ```bash
-   git clone https://github.com/its-maestro-baby/maestro.git
-   cd maestro
+   docker exec maestro-web ls -la /root/.claude
+   docker exec maestro-web ls -la /root/.config/gemini
+   docker exec maestro-web ls -la /root/.codex
    ```
 
-2. **Open in Xcode:**
-   ```bash
-   open claude-maestro.xcodeproj
-   ```
+#### ❌ Terminal Shows "Error" Status
+```bash
+# Check container logs
+docker logs maestro-web
 
-3. **Build and run** (⌘R)
+# Check specific session status
+curl http://localhost:3100/api/sessions
+```
 
-The Swift MCP server (`MaestroMCPServer/`) is built automatically as part of the Xcode build process.
+#### ❌ WebSocket Connection Fails
+- **Reverse Proxy**: Ensure WebSocket upgrade support
+- **Firewall**: Check port 3100 is accessible
+- **Browser**: Try different browser or disable extensions
 
-4. **Configure MCP (optional):**
-   ```bash
-   cp .mcp.json.example .mcp.json
-   ```
-   Edit `.mcp.json` and update the `command` path to point to your built MaestroMCPServer binary (typically found at `~/Library/Application Support/Claude Maestro/MaestroMCPServer` after first run).
+#### ❌ Session Focus Issues
+- **Click terminal** to focus before typing
+- **Clear browser cache** if switching doesn't work
+- **Check browser console** for JavaScript errors
 
-### Optional: Install AI CLIs
+#### ❌ Terminal Output Missing
+- **Terminal registry**: Output should appear immediately
+- **Restart container** if terminals are blank
+- **Check browser console** for connection errors
+
+### Health Check
 
 ```bash
-# Claude Code (recommended)
-npm install -g @anthropic-ai/claude-code
+# Container health
+docker ps | grep maestro-web
 
-# Gemini CLI
-npm install -g @google/gemini-cli
+# API health
+curl http://localhost:3100/api/health
 
-# OpenAI Codex
-npm install -g @openai/codex
+# Session status
+curl http://localhost:3100/api/sessions
+```
+
+### Reset Configuration
+
+```bash
+# Stop container
+docker stop maestro-web
+
+# Remove config (keeps auth)
+rm -rf ./config/maestro
+
+# Restart
+docker start maestro-web
 ```
 
 ---
 
-## 🚀 Usage
+## 🛠️ Development
 
-### Quick Start
+### Project Structure
 
-1. **Launch Claude Maestro**
-2. **Select a project directory** (ideally a git repository)
-3. **Configure sessions** in the sidebar:
-   - Set the number of terminals (1-12)
-   - Choose AI mode for each session
-   - Assign branches to sessions
-4. **Click "Launch"** to start all sessions
-5. Each session opens in its own worktree with the AI ready to work
-
-### Session Management
-
-- **Add sessions:** Click the floating `+` button
-- **Close sessions:** Click the `×` on the session header
-- **Change mode:** Use the mode dropdown in the session header
-- **Assign branch:** Select from the branch dropdown
-
-### Git Worktree Isolation
-
-When you assign a branch to a session:
-1. Maestro creates a worktree at `~/.claude-maestro/worktrees/{repo-hash}/{branch}`
-2. The session's terminal opens in that worktree
-3. All file changes are isolated to that worktree
-4. Worktrees are cleaned up when sessions close
-
-### Template Presets
-
-Save your session configurations:
-1. Configure sessions as desired
-2. Click "Save Preset" in the sidebar
-3. Name your preset (e.g., "Feature Development", "Bug Triage")
-4. Load presets from the dropdown to restore configurations
-
-### Quick Actions
-
-Each session can have quick action buttons:
-- **Run App** - Tells the AI to run the application
-- **Commit & Push** - Tells the AI to commit and push changes
-- **Custom** - Configure your own prompts
-
----
-
-## ⚙️ Configuration
-
-### Session Persistence
-
-Session configurations (modes, branches, count) are automatically persisted to UserDefaults and restored on app launch.
-
----
-
-## 🔧 Troubleshooting
-
-### Claude Command Not Found
-
-The Claude CLI must be installed globally and in your PATH:
-```bash
-npm install -g @anthropic-ai/claude-code
-which claude  # Should show the path
+```
+maestro/
+├── web/                    # React frontend
+│   ├── src/
+│   │   ├── components/     # React components
+│   │   │   ├── Terminal.tsx
+│   │   │   ├── SessionCard.tsx
+│   │   │   └── SessionSettings.tsx
+│   │   ├── hooks/          # React hooks
+│   │   └── types/          # TypeScript types
+│   └── package.json
+├── server/                 # Node.js backend
+│   ├── src/
+│   │   ├── managers/       # Core business logic
+│   │   │   ├── SessionManager.ts
+│   │   │   └── ProfileManager.ts
+│   │   ├── websocket/      # WebSocket handling
+│   │   └── types/          # Shared types
+│   └── package.json
+├── docker-compose.yml      # Development setup
+├── Dockerfile              # Production build
+└── Dockerfile.dev          # Development build
 ```
 
-### Worktree Issues
+### Local Development
 
-If worktrees get into a bad state:
 ```bash
-# List all worktrees
-git worktree list
+# Clone repository
+git clone https://github.com/luke7524811/maestro.git
+cd maestro
 
-# Remove a specific worktree
-git worktree remove /path/to/worktree --force
+# Development mode (hot reload)
+docker-compose up maestro-dev
 
-# Prune stale worktree entries
-git worktree prune
+# Frontend: http://localhost:3000 (Vite dev server)
+# Backend: http://localhost:3100 (Express API)
+```
+
+### Building
+
+```bash
+# Production build
+docker build -t maestro-web .
+
+# Development build
+docker build -f Dockerfile.dev -t maestro-dev .
 ```
 
 ---
 
 ## 🤝 Contributing
 
-### Development Setup
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
-1. Fork and clone the repository
-2. Open `claude-maestro.xcodeproj` in Xcode
-3. Make your changes
-4. Test thoroughly with multiple sessions
+### Development Workflow
 
-### Project Structure
-
-```
-claude-maestro/
-├── claude-maestro/              # Swift/SwiftUI macOS app
-│   ├── ContentView.swift        # Main view and session management
-│   ├── TerminalView.swift       # SwiftTerm integration
-│   ├── WorktreeManager.swift    # Git worktree management
-│   ├── GitManager.swift         # Git operations
-│   ├── GitTreeView.swift        # Commit graph visualization
-│   └── ...
-├── MaestroMCPServer/            # Swift MCP server
-│   ├── Sources/
-│   │   └── MaestroMCPServer/    # MCP tool implementations
-│   └── Package.swift
-└── README.md
-```
+1. **Fork** the repository
+2. **Create feature branch**: `git checkout -b feature/amazing-feature`
+3. **Make changes** and test thoroughly
+4. **Commit**: `git commit -m 'Add amazing feature'`
+5. **Push**: `git push origin feature/amazing-feature`
+6. **Open Pull Request** with detailed description
 
 ### Code Style
 
-- Follow Apple's Swift API Design Guidelines
+- **TypeScript** for all new code
+- **ESLint + Prettier** for consistent formatting
+- **React functional components** with hooks
+- **Comprehensive error handling**
+- **Security-first approach**
 
 ---
 
@@ -308,12 +536,20 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-## 🙏 Acknowledgments
+## 🙏 Credits
 
-- [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) - Terminal emulator for Swift
-- [Model Context Protocol](https://modelcontextprotocol.io/) - MCP SDK
-- [Claude Code](https://claude.ai/claude-code) - AI coding assistant
+- **Original Maestro** by [Jack](https://github.com/its-maestro-baby/maestro) - Swift/macOS version
+- **Web Port** adaptation for Docker deployment and cross-platform use
+- **Claude Code** by [Anthropic](https://claude.ai/claude-code)
+- **xterm.js** by [xtermjs.org](https://xtermjs.org/)
+- **Catppuccin** theme by [catppuccin.com](https://catppuccin.com/)
 
 ---
 
-Built with Love by Jack
+## 🌟 Star History
+
+If this project helps you, please consider giving it a star! ⭐
+
+---
+
+*Built for developers who want to harness the full power of AI coding assistants without waiting around.* 🚀

@@ -103,6 +103,28 @@ app.patch('/api/sessions/:id/branch', (req, res) => {
   res.json(sessionManager.getSession(id));
 });
 
+// Rename session (set custom name/label)
+app.patch('/api/sessions/:id/name', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { name } = req.body;
+  const session = sessionManager.getSession(id);
+  if (!session) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+  sessionManager.setSessionName(id, name || null);
+  res.json(sessionManager.getSession(id));
+});
+
+// Duplicate session (create new session with same configuration)
+app.post('/api/sessions/:id/duplicate', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const newSession = sessionManager.duplicateSession(id);
+  if (!newSession) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+  res.status(201).json(newSession);
+});
+
 // Send command to session
 app.post('/api/sessions/:id/command', (req, res) => {
   const id = parseInt(req.params.id, 10);
@@ -389,6 +411,63 @@ app.put('/api/directories/favorites', (req, res) => {
   res.json({ success: true, favorites: profileManager.getFavoritePaths() });
 });
 
+// ========== Session Persistence API ==========
+
+// Get persistence status and statistics
+app.get('/api/persistence', (req, res) => {
+  res.json({
+    enabled: sessionManager.isPersistenceEnabled(),
+    stats: sessionManager.getPersistenceStats()
+  });
+});
+
+// Enable/disable session persistence
+app.put('/api/persistence', (req, res) => {
+  const { enabled } = req.body;
+  if (typeof enabled !== 'boolean') {
+    return res.status(400).json({ error: 'enabled must be a boolean' });
+  }
+  sessionManager.setPersistenceEnabled(enabled);
+  res.json({
+    enabled: sessionManager.isPersistenceEnabled(),
+    stats: sessionManager.getPersistenceStats()
+  });
+});
+
+// Force save all session states
+app.post('/api/persistence/save', (req, res) => {
+  sessionManager.forceSaveState();
+  res.json({
+    success: true,
+    savedAt: new Date().toISOString(),
+    stats: sessionManager.getPersistenceStats()
+  });
+});
+
+// Get command history for a session
+app.get('/api/sessions/:id/history', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const history = sessionManager.getSessionHistory(id);
+  res.json({ sessionId: id, history });
+});
+
+// Clear persistence data for a session
+app.delete('/api/sessions/:id/persistence', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  sessionManager.clearSessionPersistenceData(id);
+  res.json({ success: true, sessionId: id });
+});
+
+// Restore a session from snapshot (admin/debug endpoint)
+app.post('/api/persistence/restore/:snapshotId', (req, res) => {
+  const snapshotId = parseInt(req.params.snapshotId, 10);
+  const restoredSession = sessionManager.restoreSessionFromSnapshot(snapshotId);
+  if (!restoredSession) {
+    return res.status(404).json({ error: 'Snapshot not found' });
+  }
+  res.json({ success: true, session: restoredSession });
+});
+
 // SPA fallback - serve index.html for client-side routing
 app.get('*', (req, res) => {
   const indexPath = path.join(webDistPath, 'index.html');
@@ -424,7 +503,7 @@ server.listen(PORT, '0.0.0.0', () => {
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down...');
-  sessionManager.closeAllSessions();
+  sessionManager.shutdown(); // Saves state before closing
   wsManager.close();
   server.close(() => {
     console.log('Server closed');
@@ -434,7 +513,7 @@ process.on('SIGTERM', () => {
 
 process.on('SIGINT', () => {
   console.log('SIGINT received, shutting down...');
-  sessionManager.closeAllSessions();
+  sessionManager.shutdown(); // Saves state before closing
   wsManager.close();
   server.close(() => {
     console.log('Server closed');

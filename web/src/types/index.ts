@@ -87,6 +87,7 @@ export const SessionStatusConfig: Record<SessionStatus, {
 
 export interface SessionInfo {
   id: number;
+  name: string | null; // Custom session name/label
   status: SessionStatus;
   mode: TerminalMode;
   assignedBranch: string | null;

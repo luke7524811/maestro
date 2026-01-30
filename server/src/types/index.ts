@@ -100,6 +100,7 @@ export const SessionStatusConfig: Record<SessionStatus, {
 // SessionInfo - matches Swift struct
 export interface SessionInfo {
   id: number;
+  name: string | null; // Custom session name/label
   status: SessionStatus;
   mode: TerminalMode;
   assignedBranch: string | null;
@@ -129,6 +130,7 @@ export interface SessionInfo {
 export function createSession(id: number, mode: TerminalMode = TerminalMode.ClaudeCode): SessionInfo {
   return {
     id,
+    name: null, // Default to null, shows as "Mode #id" when not set
     status: SessionStatus.Idle,
     mode,
     assignedBranch: null,

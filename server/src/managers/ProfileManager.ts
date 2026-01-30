@@ -37,7 +37,7 @@ export class ProfileManager extends EventEmitter {
 
   // Load config from file or defaults
   private loadConfig(): { allowedDirectories: string[]; favoritePaths: string[]; guardrails: string } {
-    const defaultDirs = ['/workspace', '/root', '/home', '/mnt', '/data', '/projects', '/app'];
+    const defaultDirs = ['/workspace', '/host', '/root', '/home', '/mnt', '/data', '/projects', '/app'];
     const defaultFavorites: string[] = [];
     const defaultGuardrails = '';
 

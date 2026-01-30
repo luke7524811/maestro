@@ -19,6 +19,7 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { SessionCard, writeToSession } from './components/SessionCard';
 import { SessionSettings } from './components/SessionSettings';
 import { AppSettings } from './components/AppSettings';
+import { CommandReference, CommandReferenceButton } from './components/CommandReference';
 import {
   SessionInfo,
   SessionStatus,
@@ -65,6 +66,8 @@ const App: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
   const [showAppSettings, setShowAppSettings] = useState(false);
+  const [showCommandReference, setShowCommandReference] = useState(false);
+  const [focusedSessionId, setFocusedSessionId] = useState<number | null>(null);
   const terminalWritersRef = useRef<Map<number, (data: string) => void>>(new Map());
 
   const {
@@ -130,6 +133,11 @@ const App: React.FC = () => {
   const handleInput = useCallback((sessionId: number, data: string) => {
     sendInput(sessionId, data);
   }, [sendInput]);
+
+  // Handle session focus
+  const handleSessionFocus = useCallback((sessionId: number) => {
+    setFocusedSessionId(sessionId);
+  }, []);
 
   // Handle session resize
   const handleResize = useCallback((sessionId: number, cols: number, rows: number) => {
@@ -223,6 +231,47 @@ const App: React.FC = () => {
     }
   }, [sessions]);
 
+  // Handle session rename
+  const handleRename = useCallback(async (sessionId: number, name: string | null) => {
+    // Update local state immediately
+    setSessions(prev => prev.map(s =>
+      s.id === sessionId ? { ...s, name } : s
+    ));
+
+    // Update via API
+    try {
+      await fetch(`/api/sessions/${sessionId}/name`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+    } catch (error) {
+      console.error('Failed to rename session:', error);
+    }
+  }, []);
+
+  // Handle session duplicate
+  const handleDuplicate = useCallback(async (sessionId: number) => {
+    if (sessions.length >= 12) {
+      console.warn('Maximum 12 sessions allowed');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/duplicate`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        const newSession = await res.json();
+        setSessions(prev => [...prev, newSession]);
+      } else {
+        console.error('Failed to duplicate session');
+      }
+    } catch (error) {
+      console.error('Failed to duplicate session:', error);
+    }
+  }, [sessions.length]);
+
   // Handle add session
   const handleAddSession = useCallback(() => {
     if (sessions.length < 12) {
@@ -300,6 +349,12 @@ const App: React.FC = () => {
 
         <div className="flex-1" />
 
+        {/* Command Reference button */}
+        <CommandReferenceButton onClick={() => setShowCommandReference(true)} />
+
+        {/* Separator */}
+        <div className="w-px h-4 bg-ctp-surface1" />
+
         {/* Legend */}
         <div className="flex items-center gap-3">
           <LegendItem status={SessionStatus.Initializing} />
@@ -335,6 +390,7 @@ const App: React.FC = () => {
               <SessionCard
                 key={session.id}
                 session={session}
+                isFocused={focusedSessionId === session.id}
                 onLaunch={handleLaunch}
                 onClose={handleClose}
                 onInput={handleInput}
@@ -342,6 +398,9 @@ const App: React.FC = () => {
                 onSetMode={handleSetMode}
                 onUpdateSettings={handleUpdateSettings}
                 onSaveAsProfile={handleSaveAsProfile}
+                onFocus={handleSessionFocus}
+                onRename={handleRename}
+                onDuplicate={handleDuplicate}
               />
             ))}
           </div>
@@ -498,6 +557,11 @@ const App: React.FC = () => {
       {/* App settings modal */}
       {showAppSettings && (
         <AppSettings onClose={() => setShowAppSettings(false)} />
+      )}
+
+      {/* Command Reference modal */}
+      {showCommandReference && (
+        <CommandReference onClose={() => setShowCommandReference(false)} />
       )}
     </div>
   );

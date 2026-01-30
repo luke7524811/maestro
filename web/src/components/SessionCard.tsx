@@ -20,6 +20,7 @@ import {
   ChevronDown,
   ExternalLink,
   Settings,
+  Copy,
   LucideProps
 } from 'lucide-react';
 import { SessionSettings } from './SessionSettings';
@@ -35,6 +36,7 @@ import { Terminal, writeToTerminal } from './Terminal';
 
 interface SessionCardProps {
   session: SessionInfo;
+  isFocused?: boolean;
   onLaunch: (sessionId: number) => void;
   onClose: (sessionId: number) => void;
   onInput: (sessionId: number, data: string) => void;
@@ -42,6 +44,9 @@ interface SessionCardProps {
   onSetMode: (sessionId: number, mode: TerminalMode) => void;
   onUpdateSettings: (sessionId: number, settings: Partial<SessionInfo>) => void;
   onSaveAsProfile?: (sessionId: number, name: string) => void;
+  onFocus?: (sessionId: number) => void;
+  onRename?: (sessionId: number, name: string | null) => void;
+  onDuplicate?: (sessionId: number) => void;
 }
 
 // Icon map for dynamic rendering
@@ -63,20 +68,30 @@ const ModeIcons: Record<string, React.FC<LucideProps>> = {
 
 export const SessionCard: React.FC<SessionCardProps> = ({
   session,
+  isFocused = false,
   onLaunch,
   onClose,
   onInput,
   onResize,
   onSetMode,
   onUpdateSettings,
-  onSaveAsProfile
+  onSaveAsProfile,
+  onFocus,
+  onRename,
+  onDuplicate
 }) => {
   const terminalRef = useRef<HTMLDivElement>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editingName, setEditingName] = useState(session.name || '');
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const statusConfig = SessionStatusConfig[session.status];
   const modeConfig = TerminalModeConfig[session.mode];
   const StatusIcon = StatusIcons[statusConfig.icon] || Circle;
   const ModeIcon = ModeIcons[modeConfig.icon] || TerminalIcon;
+
+  // Get display name - custom name or default "Mode #id"
+  const displayName = session.name || `${modeConfig.shortLabel} #${session.id}`;
 
   // Determine if terminal should be shown
   const showTerminal = session.isTerminalLaunched;
@@ -103,6 +118,13 @@ export const SessionCard: React.FC<SessionCardProps> = ({
     onClose(session.id);
   }, [session.id, onClose]);
 
+  // Handle duplicate click
+  const handleDuplicate = useCallback(() => {
+    if (onDuplicate) {
+      onDuplicate(session.id);
+    }
+  }, [session.id, onDuplicate]);
+
   // Mode selector dropdown
   const [showModeMenu, setShowModeMenu] = React.useState(false);
 
@@ -118,18 +140,50 @@ export const SessionCard: React.FC<SessionCardProps> = ({
     }
   }, [session.id, onSaveAsProfile]);
 
-  // Border color based on status
-  const borderColor = statusConfig.color;
-  const borderClass = isWorking ? 'status-working' : '';
+  // Handle name editing
+  const handleStartEditName = useCallback(() => {
+    setEditingName(session.name || '');
+    setIsEditingName(true);
+    setTimeout(() => nameInputRef.current?.focus(), 0);
+  }, [session.name]);
+
+  const handleSaveName = useCallback(() => {
+    const newName = editingName.trim() || null;
+    if (onRename) {
+      onRename(session.id, newName);
+    }
+    setIsEditingName(false);
+  }, [session.id, editingName, onRename]);
+
+  const handleCancelEditName = useCallback(() => {
+    setIsEditingName(false);
+    setEditingName(session.name || '');
+  }, [session.name]);
+
+  const handleNameKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSaveName();
+    } else if (e.key === 'Escape') {
+      handleCancelEditName();
+    }
+  }, [handleSaveName, handleCancelEditName]);
+
+  // Border color based on status and focus
+  const borderColor = isFocused ? '#89b4fa' : statusConfig.color; // Catppuccin blue for focus
+  const borderClass = isWorking ? 'status-working' : isFocused ? 'session-focused' : '';
 
   return (
     <div
       className={`session-card ${borderClass}`}
-      style={{ borderColor }}
+      style={{
+        borderColor,
+        borderWidth: isFocused ? '3px' : '2px',
+        boxShadow: isFocused ? '0 0 0 1px rgba(137, 180, 250, 0.3)' : 'none'
+      }}
     >
       {/* Header bar - matches Swift HStack */}
       <div
-        className="flex items-center gap-2 px-2 py-1"
+        className="flex items-center gap-2 px-2 py-1 flex-shrink-0"
         style={{ backgroundColor: `${statusConfig.color}26` }}
       >
         {/* Status indicator */}
@@ -173,13 +227,29 @@ export const SessionCard: React.FC<SessionCardProps> = ({
           )}
         </div>
 
-        {/* Session label */}
-        <span
-          className="text-xs font-medium"
-          style={{ color: modeConfig.color }}
-        >
-          {modeConfig.shortLabel} #{session.id}
-        </span>
+        {/* Session label - click to edit */}
+        {isEditingName ? (
+          <input
+            ref={nameInputRef}
+            type="text"
+            value={editingName}
+            onChange={(e) => setEditingName(e.target.value)}
+            onBlur={handleSaveName}
+            onKeyDown={handleNameKeyDown}
+            className="text-xs font-medium bg-ctp-surface0 px-1 py-0.5 rounded border border-ctp-blue outline-none min-w-[60px] max-w-[120px]"
+            style={{ color: modeConfig.color }}
+            placeholder={`${modeConfig.shortLabel} #${session.id}`}
+          />
+        ) : (
+          <span
+            className="text-xs font-medium cursor-pointer hover:underline"
+            style={{ color: modeConfig.color }}
+            onClick={handleStartEditName}
+            title="Click to rename session"
+          >
+            {displayName}
+          </span>
+        )}
 
         <div className="flex-1" />
 
@@ -199,6 +269,17 @@ export const SessionCard: React.FC<SessionCardProps> = ({
             title="Session Settings"
           >
             <Settings className="w-4 h-4 text-ctp-subtext0 hover:text-ctp-mauve" />
+          </button>
+        )}
+
+        {/* Duplicate button (pre-launch) */}
+        {!showTerminal && !session.shouldLaunchTerminal && onDuplicate && (
+          <button
+            onClick={handleDuplicate}
+            className="p-1 rounded hover:bg-ctp-surface0"
+            title="Duplicate Session"
+          >
+            <Copy className="w-4 h-4 text-ctp-subtext0 hover:text-ctp-blue" />
           </button>
         )}
 
@@ -232,12 +313,13 @@ export const SessionCard: React.FC<SessionCardProps> = ({
       </div>
 
       {/* Terminal content area */}
-      <div className="flex-1 relative bg-ctp-base" ref={terminalRef}>
+      <div className="flex-1 relative bg-ctp-base min-h-0 overflow-hidden" ref={terminalRef}>
         {showTerminal ? (
           <Terminal
             sessionId={session.id}
             onData={handleData}
             onResize={handleResize}
+            onFocus={() => onFocus && onFocus(session.id)}
           />
         ) : showLaunchPlaceholder ? (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -271,7 +353,7 @@ export const SessionCard: React.FC<SessionCardProps> = ({
       {/* Footer bar (when running) */}
       {showTerminal && (
         <div
-          className="flex items-center gap-2 px-2 py-1"
+          className="flex items-center gap-2 px-2 py-1 flex-shrink-0"
           style={{ backgroundColor: `${statusConfig.color}26` }}
         >
           {/* Error message display */}

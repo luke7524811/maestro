@@ -19,7 +19,10 @@ services:
       # - GEMINI_API_KEY=your-key-here
       # - OPENAI_API_KEY=your-key-here
     volumes:
-      # Mount workspace for projects
+      # Mount host root filesystem for full access to all directories
+      # This allows sessions to start anywhere on the host
+      - /:/host:rw
+      # Mount workspace for projects (kept for backward compatibility)
       - ./workspace:/workspace:rw
       # Persist Maestro config (profiles, allowed directories, favorites, guardrails)
       - ./config/maestro:/app/config:rw
