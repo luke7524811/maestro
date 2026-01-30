@@ -268,6 +268,9 @@ export class SessionManager extends EventEmitter {
     session.outputBuffer += data;
     session.lastOutputTime = new Date();
 
+    // Track last output for debugging (last 500 chars)
+    session.info.lastOutput = session.outputBuffer.slice(-500);
+
     // Emit output to clients
     this.emit('sessionOutput', sessionId, data);
 
@@ -313,6 +316,14 @@ export class SessionManager extends EventEmitter {
     for (const pattern of ERROR_PATTERNS) {
       if (lowercased.includes(pattern)) {
         session.info.status = SessionStatus.Error;
+        // Extract the line containing the error for display
+        const lines = text.split('\n');
+        for (const line of lines) {
+          if (line.toLowerCase().includes(pattern)) {
+            session.info.errorMessage = line.trim().slice(0, 200);
+            break;
+          }
+        }
         this.emit('sessionStatusUpdate', session.info);
         return;
       }
@@ -356,6 +367,10 @@ export class SessionManager extends EventEmitter {
       session.info.status = SessionStatus.Done;
     } else {
       session.info.status = SessionStatus.Error;
+      // Set error message if not already set by pattern detection
+      if (!session.info.errorMessage) {
+        session.info.errorMessage = `Process exited with code ${exitCode}`;
+      }
     }
 
     session.info.isTerminalLaunched = false;

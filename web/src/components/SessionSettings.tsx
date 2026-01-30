@@ -16,15 +16,30 @@ import {
   Folder,
   X,
   Save,
-  Bookmark
+  Bookmark,
+  Download
 } from 'lucide-react';
 import {
   SessionInfo,
+  TerminalMode,
   TerminalModeConfig,
   PermissionModeConfig,
   DirectoryEntry,
   TERMINAL_MODES
 } from '../types';
+
+// Profile type (matches server)
+interface SessionProfile {
+  id: string;
+  name: string;
+  mode: TerminalMode;
+  permissionMode: string;
+  workingDirectory: string | null;
+  customFlags: string[];
+  envVars: Record<string, string>;
+  wrapperCommand: string | null;
+  isDefault: boolean;
+}
 
 interface SessionSettingsProps {
   session: SessionInfo;
@@ -51,6 +66,37 @@ export const SessionSettings: React.FC<SessionSettingsProps> = ({
   const [showProfileSave, setShowProfileSave] = useState(false);
   const [profileName, setProfileName] = useState('');
   const [activeTab, setActiveTab] = useState<'basic' | 'advanced'>('basic');
+  const [profiles, setProfiles] = useState<SessionProfile[]>([]);
+  const [showProfileLoad, setShowProfileLoad] = useState(false);
+
+  // Load profiles on mount
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      try {
+        const res = await fetch('/api/profiles');
+        if (res.ok) {
+          const data = await res.json();
+          setProfiles(data);
+        }
+      } catch (e) {
+        console.error('Failed to fetch profiles:', e);
+      }
+    };
+    fetchProfiles();
+  }, []);
+
+  // Apply a profile
+  const applyProfile = useCallback((profile: SessionProfile) => {
+    setMode(profile.mode);
+    setPermissionMode(profile.permissionMode);
+    setWorkingDirectory(profile.workingDirectory || '');
+    setCustomFlags(profile.customFlags?.join(' ') || '');
+    setEnvVarsText(
+      Object.entries(profile.envVars || {}).map(([k, v]) => `${k}=${v}`).join('\n')
+    );
+    setWrapperCommand(profile.wrapperCommand || '');
+    setShowProfileLoad(false);
+  }, []);
 
   // Get permission config for current mode
   const permConfig = PermissionModeConfig[mode];
@@ -278,15 +324,50 @@ export const SessionSettings: React.FC<SessionSettingsProps> = ({
                 Cancel
               </button>
             </div>
+          ) : showProfileLoad ? (
+            <div className="flex-1">
+              <div className="text-xs text-ctp-subtext0 mb-2">Select a profile to load:</div>
+              <div className="flex flex-wrap gap-2">
+                {profiles.length === 0 ? (
+                  <span className="text-xs text-ctp-subtext0">No profiles saved yet</span>
+                ) : (
+                  profiles.map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => applyProfile(p)}
+                      className="px-2 py-1 text-xs rounded bg-ctp-surface0 hover:bg-ctp-surface1"
+                      style={{ borderLeft: `3px solid ${TerminalModeConfig[p.mode].color}` }}
+                    >
+                      {p.name}
+                    </button>
+                  ))
+                )}
+                <button
+                  onClick={() => setShowProfileLoad(false)}
+                  className="px-2 py-1 text-xs text-ctp-subtext0 hover:text-ctp-text"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           ) : (
             <>
-              <button
-                onClick={() => setShowProfileSave(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-ctp-subtext0 hover:text-ctp-text"
-              >
-                <Bookmark className="w-4 h-4" />
-                Save as Profile
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowProfileLoad(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-ctp-subtext0 hover:text-ctp-text"
+                >
+                  <Download className="w-4 h-4" />
+                  Load Profile
+                </button>
+                <button
+                  onClick={() => setShowProfileSave(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-ctp-subtext0 hover:text-ctp-text"
+                >
+                  <Bookmark className="w-4 h-4" />
+                  Save as Profile
+                </button>
+              </div>
               <div className="flex gap-2">
                 <button
                   onClick={onClose}

@@ -107,6 +107,9 @@ export interface SessionInfo {
   customFlags: string[];
   envVars: Record<string, string>;
   wrapperCommand: string | null;
+  // Error tracking
+  errorMessage: string | null;
+  lastOutput: string | null;
 }
 
 // Permission modes for Claude Code

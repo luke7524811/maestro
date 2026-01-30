@@ -66,7 +66,19 @@ export const Terminal: React.FC<TerminalProps> = ({
 
   // Initialize terminal - use empty deps to only run once
   useEffect(() => {
-    if (!containerRef.current || terminalRef.current) return;
+    const container = containerRef.current;
+    if (!container || terminalRef.current) return;
+
+    // Ensure container has dimensions before initializing
+    const rect = container.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      // Retry after a short delay if container not ready
+      const retryTimeout = setTimeout(() => {
+        // Force re-render by triggering state change
+        container.style.minHeight = '100px';
+      }, 100);
+      return () => clearTimeout(retryTimeout);
+    }
 
     isDisposedRef.current = false;
 
@@ -85,15 +97,25 @@ export const Terminal: React.FC<TerminalProps> = ({
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
 
-    terminal.open(containerRef.current);
+    terminal.open(container);
+
+    // Store refs immediately after opening
+    terminalRef.current = terminal;
+    fitAddonRef.current = fitAddon;
 
     // Initial fit after a small delay to ensure DOM is ready
-    setTimeout(() => {
-      if (!isDisposedRef.current) {
-        fitAddon.fit();
-        terminal.focus();
+    const fitTimeout = setTimeout(() => {
+      if (!isDisposedRef.current && fitAddonRef.current && terminalRef.current) {
+        try {
+          fitAddon.fit();
+          terminal.focus();
+          // Report initial size after fit
+          onResize(terminal.cols, terminal.rows);
+        } catch (e) {
+          console.warn('Initial fit failed:', e);
+        }
       }
-    }, 50);
+    }, 100);
 
     // Handle user input - send to server
     const dataDisposable = terminal.onData((data) => {
@@ -109,26 +131,26 @@ export const Terminal: React.FC<TerminalProps> = ({
       }
     });
 
-    terminalRef.current = terminal;
-    fitAddonRef.current = fitAddon;
-
-    // Report initial size
-    onResize(terminal.cols, terminal.rows);
-
-    // Observe container resize
+    // Observe container resize with debounce
+    let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
     const resizeObserver = new ResizeObserver(() => {
-      if (fitAddonRef.current && !isDisposedRef.current) {
-        try {
-          fitAddonRef.current.fit();
-        } catch (e) {
-          // Ignore fit errors during disposal
+      if (resizeTimeout) clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        if (fitAddonRef.current && terminalRef.current && !isDisposedRef.current) {
+          try {
+            fitAddonRef.current.fit();
+          } catch (e) {
+            // Ignore fit errors during disposal
+          }
         }
-      }
+      }, 50);
     });
-    resizeObserver.observe(containerRef.current);
+    resizeObserver.observe(container);
 
     return () => {
       isDisposedRef.current = true;
+      if (resizeTimeout) clearTimeout(resizeTimeout);
+      clearTimeout(fitTimeout);
       resizeObserver.disconnect();
       dataDisposable.dispose();
       resizeDisposable.dispose();

@@ -274,6 +274,16 @@ export const SessionCard: React.FC<SessionCardProps> = ({
           className="flex items-center gap-2 px-2 py-1"
           style={{ backgroundColor: `${statusConfig.color}26` }}
         >
+          {/* Error message display */}
+          {session.status === SessionStatus.Error && session.errorMessage && (
+            <span
+              className="text-xs text-ctp-red truncate max-w-[200px] cursor-help"
+              title={session.errorMessage}
+            >
+              {session.errorMessage}
+            </span>
+          )}
+
           {/* Port badge if app running */}
           {session.isAppRunning && session.assignedPort && (
             <span className="text-xs font-medium text-ctp-green px-2 py-0.5 rounded bg-ctp-green/10">

@@ -120,6 +120,9 @@ export interface SessionInfo {
   customFlags: string[];
   envVars: Record<string, string>;
   wrapperCommand: string | null;
+  // Error tracking
+  errorMessage: string | null;
+  lastOutput: string | null;
 }
 
 // Create default session - matches Swift init
@@ -145,7 +148,10 @@ export function createSession(id: number, mode: TerminalMode = TerminalMode.Clau
     permissionMode: 'default',
     customFlags: [],
     envVars: {},
-    wrapperCommand: null
+    wrapperCommand: null,
+    // Error tracking
+    errorMessage: null,
+    lastOutput: null
   };
 }
 
