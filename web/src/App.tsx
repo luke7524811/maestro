@@ -331,6 +331,85 @@ const App: React.FC = () => {
   // Calculate grid
   const grid = getOptimalGrid(sessions.length);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input/textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      // Alt+1-9 to focus session by index
+      if (e.altKey && !e.ctrlKey && !e.metaKey && /^[1-9]$/.test(e.key)) {
+        e.preventDefault();
+        const index = parseInt(e.key, 10) - 1;
+        if (index < sessions.length) {
+          const session = sessions[index];
+          setFocusedSessionId(session.id);
+          // Focus the terminal if running
+          const terminalEl = document.querySelector(`[data-session-id="${session.id}"]`) as HTMLElement;
+          terminalEl?.click();
+        }
+      }
+
+      // Alt+N to add new session
+      if (e.altKey && e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (sessions.length < 12) {
+          handleAddSession();
+        }
+      }
+
+      // Alt+ArrowLeft/ArrowRight to cycle focus
+      if (e.altKey && !e.ctrlKey && !e.metaKey && isRunning) {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          e.preventDefault();
+          const currentIndex = focusedSessionId
+            ? sessions.findIndex(s => s.id === focusedSessionId)
+            : -1;
+          let newIndex: number;
+          if (e.key === 'ArrowRight') {
+            newIndex = currentIndex < sessions.length - 1 ? currentIndex + 1 : 0;
+          } else {
+            newIndex = currentIndex > 0 ? currentIndex - 1 : sessions.length - 1;
+          }
+          const newSession = sessions[newIndex];
+          if (newSession) {
+            setFocusedSessionId(newSession.id);
+            const terminalEl = document.querySelector(`[data-session-id="${newSession.id}"]`) as HTMLElement;
+            terminalEl?.click();
+          }
+        }
+      }
+
+      // Alt+? or Alt+/ to show command reference
+      if (e.altKey && (e.key === '?' || e.key === '/') && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setShowCommandReference(prev => !prev);
+      }
+
+      // Alt+, to show settings
+      if (e.altKey && e.key === ',' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setShowAppSettings(prev => !prev);
+      }
+
+      // Escape to close modals
+      if (e.key === 'Escape') {
+        if (showCommandReference) {
+          setShowCommandReference(false);
+        } else if (showAppSettings) {
+          setShowAppSettings(false);
+        } else if (editingSessionId !== null) {
+          setEditingSessionId(null);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [sessions, focusedSessionId, isRunning, showCommandReference, showAppSettings, editingSessionId, handleAddSession]);
+
   return (
     <div className="h-screen flex flex-col bg-ctp-base text-ctp-text">
       {/* Header */}

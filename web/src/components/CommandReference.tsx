@@ -120,18 +120,42 @@ export const CommandReference: React.FC<CommandReferenceProps> = ({ onClose }) =
 
         {/* Keyboard shortcuts info */}
         <div className="px-4 py-2 bg-ctp-surface0/50 border-b border-ctp-surface0">
-          <div className="flex items-center gap-2 text-xs text-ctp-subtext0">
+          <div className="flex items-center gap-2 text-xs text-ctp-subtext0 mb-2">
             <Keyboard className="w-3 h-3" />
-            <span>Terminal Copy/Paste Shortcuts:</span>
+            <span>Keyboard Shortcuts:</span>
           </div>
-          <div className="flex items-center gap-4 mt-1 text-xs">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-ctp-surface1 rounded text-ctp-blue font-mono">Ctrl+Shift+C</kbd>
+              <kbd className="px-1.5 py-0.5 bg-ctp-surface1 rounded text-ctp-blue font-mono text-[10px]">Ctrl+Shift+C</kbd>
               <span className="text-ctp-subtext0">Copy</span>
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-ctp-surface1 rounded text-ctp-blue font-mono">Ctrl+Shift+V</kbd>
+              <kbd className="px-1.5 py-0.5 bg-ctp-surface1 rounded text-ctp-blue font-mono text-[10px]">Ctrl+Shift+V</kbd>
               <span className="text-ctp-subtext0">Paste</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 bg-ctp-surface1 rounded text-ctp-blue font-mono text-[10px]">Alt+1-9</kbd>
+              <span className="text-ctp-subtext0">Focus session</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 bg-ctp-surface1 rounded text-ctp-blue font-mono text-[10px]">Alt+←/→</kbd>
+              <span className="text-ctp-subtext0">Cycle sessions</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 bg-ctp-surface1 rounded text-ctp-blue font-mono text-[10px]">Alt+N</kbd>
+              <span className="text-ctp-subtext0">New session</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 bg-ctp-surface1 rounded text-ctp-blue font-mono text-[10px]">Alt+/</kbd>
+              <span className="text-ctp-subtext0">This panel</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 bg-ctp-surface1 rounded text-ctp-blue font-mono text-[10px]">Alt+,</kbd>
+              <span className="text-ctp-subtext0">Settings</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 bg-ctp-surface1 rounded text-ctp-blue font-mono text-[10px]">Esc</kbd>
+              <span className="text-ctp-subtext0">Close modal</span>
             </span>
           </div>
         </div>
