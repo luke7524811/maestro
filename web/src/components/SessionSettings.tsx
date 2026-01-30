@@ -88,8 +88,8 @@ export const SessionSettings: React.FC<SessionSettingsProps> = ({
   }, [profileName, onSaveAsProfile]);
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-ctp-mantle rounded-xl w-[600px] max-h-[80vh] overflow-hidden shadow-xl border border-ctp-surface0">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-ctp-mantle rounded-xl w-[600px] max-w-full shadow-xl border border-ctp-surface0 my-auto flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-ctp-surface0">
           <div className="flex items-center gap-2">
@@ -118,7 +118,7 @@ export const SessionSettings: React.FC<SessionSettingsProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-4 overflow-y-auto max-h-[calc(80vh-150px)]">
+        <div className="p-4 overflow-y-auto flex-1 min-h-0">
           {activeTab === 'basic' ? (
             <div className="space-y-4">
               {/* Mode selector */}

@@ -21,7 +21,9 @@ export class ProfileManager extends EventEmitter {
     super();
     this.profilesPath = path.join(configDir, 'profiles.json');
     // Directories users can browse - can be extended via env var
-    this.allowedDirectories = (process.env.ALLOWED_DIRECTORIES || '/workspace,/root').split(',').map(d => d.trim());
+    // Default includes common mount points for Docker volumes
+    const defaultDirs = '/workspace,/root,/home,/mnt,/data,/projects,/app';
+    this.allowedDirectories = (process.env.ALLOWED_DIRECTORIES || defaultDirs).split(',').map(d => d.trim());
     this.loadProfiles();
   }
 
