@@ -21,6 +21,8 @@ services:
     volumes:
       # Mount workspace for projects
       - ./workspace:/workspace:rw
+      # Persist Maestro config (profiles, allowed directories, favorites, guardrails)
+      - ./config/maestro:/app/config:rw
       # Mount CLI config directories for persistent authentication
       - ./config/claude:/root/.claude:rw
       - ./config/gemini:/root/.config/gemini:rw

@@ -31,7 +31,7 @@ import {
   TerminalModeConfig,
   TERMINAL_MODES
 } from '../types';
-import { Terminal, getTerminalWriter } from './Terminal';
+import { Terminal, writeToTerminal } from './Terminal';
 
 interface SessionCardProps {
   session: SessionInfo;
@@ -331,8 +331,5 @@ export const SessionCard: React.FC<SessionCardProps> = ({
 
 // Export helper to write data to a session's terminal
 export function writeToSession(sessionId: number, data: string) {
-  const writer = getTerminalWriter(sessionId);
-  if (writer) {
-    writer(data);
-  }
+  writeToTerminal(sessionId, data);
 }

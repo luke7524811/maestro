@@ -112,11 +112,14 @@ const App: React.FC = () => {
 
   // Handle session launch
   const handleLaunch = useCallback((sessionId: number) => {
-    launchSession(sessionId, projectPath);
+    // Use session's custom working directory if set, otherwise fall back to project path
+    const session = sessions.find(s => s.id === sessionId);
+    const workingDir = session?.workingDirectory || projectPath;
+    launchSession(sessionId, workingDir);
     setSessions(prev => prev.map(s =>
       s.id === sessionId ? { ...s, shouldLaunchTerminal: true } : s
     ));
-  }, [launchSession, projectPath]);
+  }, [launchSession, projectPath, sessions]);
 
   // Handle session close
   const handleClose = useCallback((sessionId: number) => {

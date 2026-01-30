@@ -14,6 +14,45 @@ interface TerminalProps {
   onResize: (cols: number, rows: number) => void;
 }
 
+// Global registry for terminal write functions - more reliable than DOM queries
+const terminalRegistry = new Map<number, (data: string) => void>();
+// Buffer for data that arrives before terminal is ready
+const pendingDataBuffer = new Map<number, string[]>();
+
+// Register a terminal's write function
+export function registerTerminal(sessionId: number, writeFn: (data: string) => void) {
+  terminalRegistry.set(sessionId, writeFn);
+  // Flush any pending data
+  const pending = pendingDataBuffer.get(sessionId);
+  if (pending && pending.length > 0) {
+    console.log(`Flushing ${pending.length} pending messages for session ${sessionId}`);
+    pending.forEach(data => writeFn(data));
+    pendingDataBuffer.delete(sessionId);
+  }
+}
+
+// Unregister a terminal
+export function unregisterTerminal(sessionId: number) {
+  terminalRegistry.delete(sessionId);
+}
+
+// Write data to a terminal (buffers if terminal not ready)
+function writeToTerminalInternal(sessionId: number, data: string) {
+  const writeFn = terminalRegistry.get(sessionId);
+  if (writeFn) {
+    writeFn(data);
+  } else {
+    // Buffer data until terminal is ready
+    if (!pendingDataBuffer.has(sessionId)) {
+      pendingDataBuffer.set(sessionId, []);
+    }
+    pendingDataBuffer.get(sessionId)!.push(data);
+    console.log(`Buffering data for session ${sessionId} (terminal not ready)`);
+  }
+}
+
+export const writeToTerminal = writeToTerminalInternal;
+
 // Catppuccin Mocha theme - matches Swift installColors
 const CATPPUCCIN_THEME = {
   background: '#1e1e2e',
@@ -53,16 +92,18 @@ export const Terminal: React.FC<TerminalProps> = ({
   const writeData = useCallback((data: string) => {
     if (terminalRef.current && !isDisposedRef.current) {
       terminalRef.current.write(data);
+      // Auto-scroll to bottom when new data arrives
+      terminalRef.current.scrollToBottom();
     }
   }, []);
 
-  // Expose writeData method via ref
+  // Register terminal write function in global registry
   useEffect(() => {
-    const container = containerRef.current;
-    if (container) {
-      (container as any).writeData = writeData;
-    }
-  }, [writeData]);
+    registerTerminal(sessionId, writeData);
+    return () => {
+      unregisterTerminal(sessionId);
+    };
+  }, [sessionId, writeData]);
 
   // Initialize terminal - use empty deps to only run once
   useEffect(() => {
@@ -188,8 +229,3 @@ export const Terminal: React.FC<TerminalProps> = ({
   );
 };
 
-// Helper to get terminal write function from DOM element
-export function getTerminalWriter(sessionId: number): ((data: string) => void) | null {
-  const container = document.querySelector(`[data-session-id="${sessionId}"]`) as any;
-  return container?.writeData || null;
-}

@@ -346,6 +346,49 @@ app.put('/api/guardrails', (req, res) => {
   res.json({ success: true, guardrails: profileManager.getGuardrails() });
 });
 
+// ========== Favorite Paths API ==========
+
+// Get favorite paths
+app.get('/api/directories/favorites', (req, res) => {
+  res.json(profileManager.getFavoritePaths());
+});
+
+// Add favorite path
+app.post('/api/directories/favorites', (req, res) => {
+  const { path: dirPath } = req.body;
+  if (!dirPath) {
+    return res.status(400).json({ error: 'Path is required' });
+  }
+  const added = profileManager.addFavoritePath(dirPath);
+  if (!added) {
+    return res.status(409).json({ error: 'Path already in favorites' });
+  }
+  res.json({ success: true, favorites: profileManager.getFavoritePaths() });
+});
+
+// Remove favorite path
+app.delete('/api/directories/favorites', (req, res) => {
+  const { path: dirPath } = req.body;
+  if (!dirPath) {
+    return res.status(400).json({ error: 'Path is required' });
+  }
+  const removed = profileManager.removeFavoritePath(dirPath);
+  if (!removed) {
+    return res.status(404).json({ error: 'Path not in favorites' });
+  }
+  res.json({ success: true, favorites: profileManager.getFavoritePaths() });
+});
+
+// Set all favorite paths
+app.put('/api/directories/favorites', (req, res) => {
+  const { paths } = req.body;
+  if (!paths || !Array.isArray(paths)) {
+    return res.status(400).json({ error: 'Paths array is required' });
+  }
+  profileManager.setFavoritePaths(paths);
+  res.json({ success: true, favorites: profileManager.getFavoritePaths() });
+});
+
 // SPA fallback - serve index.html for client-side routing
 app.get('*', (req, res) => {
   const indexPath = path.join(webDistPath, 'index.html');

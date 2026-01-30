@@ -17,6 +17,7 @@ export class ProfileManager extends EventEmitter {
   private profilesPath: string;
   private configPath: string;
   private allowedDirectories: string[];
+  private favoritePaths: string[];
   private guardrails: string;
   private configDir: string;
 
@@ -29,13 +30,15 @@ export class ProfileManager extends EventEmitter {
     // Load config from file, env vars, or use defaults
     const config = this.loadConfig();
     this.allowedDirectories = config.allowedDirectories;
+    this.favoritePaths = config.favoritePaths;
     this.guardrails = config.guardrails;
     this.loadProfiles();
   }
 
   // Load config from file or defaults
-  private loadConfig(): { allowedDirectories: string[]; guardrails: string } {
+  private loadConfig(): { allowedDirectories: string[]; favoritePaths: string[]; guardrails: string } {
     const defaultDirs = ['/workspace', '/root', '/home', '/mnt', '/data', '/projects', '/app'];
+    const defaultFavorites: string[] = [];
     const defaultGuardrails = '';
 
     // First try config file
@@ -45,9 +48,12 @@ export class ProfileManager extends EventEmitter {
         const dirs = config.allowedDirectories && Array.isArray(config.allowedDirectories)
           ? config.allowedDirectories
           : (process.env.ALLOWED_DIRECTORIES?.split(',').map(d => d.trim()) || defaultDirs);
+        const favorites = config.favoritePaths && Array.isArray(config.favoritePaths)
+          ? config.favoritePaths
+          : defaultFavorites;
         const guardrails = typeof config.guardrails === 'string' ? config.guardrails : defaultGuardrails;
-        console.log(`Loaded config: ${dirs.length} allowed directories, guardrails: ${guardrails ? 'set' : 'empty'}`);
-        return { allowedDirectories: dirs, guardrails };
+        console.log(`Loaded config: ${dirs.length} allowed directories, ${favorites.length} favorites, guardrails: ${guardrails ? 'set' : 'empty'}`);
+        return { allowedDirectories: dirs, favoritePaths: favorites, guardrails };
       }
     } catch (error) {
       console.error('Failed to load config:', error);
@@ -57,7 +63,7 @@ export class ProfileManager extends EventEmitter {
     const dirs = process.env.ALLOWED_DIRECTORIES?.split(',').map(d => d.trim()) || defaultDirs;
     const guardrails = process.env.GUARDRAILS || defaultGuardrails;
 
-    return { allowedDirectories: dirs, guardrails };
+    return { allowedDirectories: dirs, favoritePaths: defaultFavorites, guardrails };
   }
 
   // Save config to disk
@@ -68,6 +74,7 @@ export class ProfileManager extends EventEmitter {
       }
       const config = {
         allowedDirectories: this.allowedDirectories,
+        favoritePaths: this.favoritePaths,
         guardrails: this.guardrails
       };
       fs.writeFileSync(this.configPath, JSON.stringify(config, null, 2), 'utf-8');
@@ -232,17 +239,9 @@ export class ProfileManager extends EventEmitter {
       return false;
     }
 
-    // Verify directory exists
-    try {
-      const stats = fs.statSync(normalizedPath);
-      if (!stats.isDirectory()) {
-        throw new Error('Path is not a directory');
-      }
-    } catch (error) {
-      console.error(`Cannot add directory ${normalizedPath}:`, error);
-      throw new Error(`Directory does not exist: ${normalizedPath}`);
-    }
-
+    // Don't validate if directory exists - it may be a path that exists
+    // on the host but is mounted into the container at runtime
+    // Just add it to the allowed list
     this.allowedDirectories.push(normalizedPath);
     this.allowedDirectories.sort();
     this.saveConfig();
@@ -282,6 +281,49 @@ export class ProfileManager extends EventEmitter {
     this.guardrails = guardrails;
     this.saveConfig();
     this.emit('configUpdated', { guardrails: this.guardrails });
+  }
+
+  // Get favorite paths for quick directory selection
+  getFavoritePaths(): string[] {
+    return this.favoritePaths;
+  }
+
+  // Add a favorite path
+  addFavoritePath(dirPath: string): boolean {
+    const normalizedPath = path.normalize(dirPath);
+
+    // Check if already exists
+    if (this.favoritePaths.includes(normalizedPath)) {
+      return false;
+    }
+
+    this.favoritePaths.push(normalizedPath);
+    this.favoritePaths.sort();
+    this.saveConfig();
+    this.emit('configUpdated', { favoritePaths: this.favoritePaths });
+    return true;
+  }
+
+  // Remove a favorite path
+  removeFavoritePath(dirPath: string): boolean {
+    const normalizedPath = path.normalize(dirPath);
+    const index = this.favoritePaths.indexOf(normalizedPath);
+
+    if (index === -1) {
+      return false;
+    }
+
+    this.favoritePaths.splice(index, 1);
+    this.saveConfig();
+    this.emit('configUpdated', { favoritePaths: this.favoritePaths });
+    return true;
+  }
+
+  // Set all favorite paths at once
+  setFavoritePaths(paths: string[]): void {
+    this.favoritePaths = paths.map(p => path.normalize(p));
+    this.saveConfig();
+    this.emit('configUpdated', { favoritePaths: this.favoritePaths });
   }
 
   // List directory contents (for file browser)

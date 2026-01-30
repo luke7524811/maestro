@@ -212,6 +212,11 @@ export class SessionManager extends EventEmitter {
     }
 
     try {
+      console.log(`Launching session ${sessionId}: mode=${mode}, cwd=${cwd}`);
+      if (mode !== TerminalMode.PlainTerminal) {
+        console.log(`CLI command: ${this.buildCliCommand(session)}`);
+      }
+
       // Spawn PTY - equivalent to Swift LocalProcessTerminalView.startProcess
       const ptyProcess = pty.spawn(this.defaultShell, shellArgs, {
         name: 'xterm-256color',
