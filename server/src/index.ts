@@ -329,6 +329,23 @@ app.get('/api/directories', (req, res) => {
   }
 });
 
+// ========== Guardrails API ==========
+
+// Get guardrails
+app.get('/api/guardrails', (req, res) => {
+  res.json({ guardrails: profileManager.getGuardrails() });
+});
+
+// Set guardrails
+app.put('/api/guardrails', (req, res) => {
+  const { guardrails } = req.body;
+  if (typeof guardrails !== 'string') {
+    return res.status(400).json({ error: 'Guardrails must be a string' });
+  }
+  profileManager.setGuardrails(guardrails);
+  res.json({ success: true, guardrails: profileManager.getGuardrails() });
+});
+
 // SPA fallback - serve index.html for client-side routing
 app.get('*', (req, res) => {
   const indexPath = path.join(webDistPath, 'index.html');

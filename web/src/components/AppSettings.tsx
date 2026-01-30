@@ -11,7 +11,8 @@ import {
   Trash2,
   X,
   AlertCircle,
-  Check
+  Check,
+  Shield
 } from 'lucide-react';
 
 interface AppSettingsProps {
@@ -21,26 +22,35 @@ interface AppSettingsProps {
 export const AppSettings: React.FC<AppSettingsProps> = ({ onClose }) => {
   const [allowedDirectories, setAllowedDirectories] = useState<string[]>([]);
   const [newDirectory, setNewDirectory] = useState('');
+  const [guardrails, setGuardrails] = useState('');
+  const [guardrailsSaved, setGuardrailsSaved] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load allowed directories
+  // Load settings
   useEffect(() => {
-    const loadDirectories = async () => {
+    const loadSettings = async () => {
       try {
-        const res = await fetch('/api/directories/allowed');
-        if (res.ok) {
-          const dirs = await res.json();
+        const [dirsRes, guardrailsRes] = await Promise.all([
+          fetch('/api/directories/allowed'),
+          fetch('/api/guardrails')
+        ]);
+        if (dirsRes.ok) {
+          const dirs = await dirsRes.json();
           setAllowedDirectories(dirs);
         }
+        if (guardrailsRes.ok) {
+          const data = await guardrailsRes.json();
+          setGuardrails(data.guardrails || '');
+        }
       } catch (err) {
-        setError('Failed to load directories');
+        setError('Failed to load settings');
       } finally {
         setLoading(false);
       }
     };
-    loadDirectories();
+    loadSettings();
   }, []);
 
   // Add directory
@@ -105,6 +115,38 @@ export const AppSettings: React.FC<AppSettingsProps> = ({ onClose }) => {
     if (e.key === 'Enter') {
       handleAddDirectory();
     }
+  };
+
+  // Save guardrails
+  const handleSaveGuardrails = useCallback(async () => {
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const res = await fetch('/api/guardrails', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guardrails })
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || 'Failed to save guardrails');
+        return;
+      }
+
+      setGuardrailsSaved(true);
+      setSuccess('Guardrails saved');
+      setTimeout(() => setSuccess(null), 2000);
+    } catch (err) {
+      setError('Failed to save guardrails');
+    }
+  }, [guardrails]);
+
+  // Handle guardrails change
+  const handleGuardrailsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setGuardrails(e.target.value);
+    setGuardrailsSaved(false);
   };
 
   return (
@@ -199,6 +241,45 @@ export const AppSettings: React.FC<AppSettingsProps> = ({ onClose }) => {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Guardrails Section */}
+          <div className="mt-6 pt-6 border-t border-ctp-surface0">
+            <div className="flex items-center gap-2 mb-3">
+              <Shield className="w-4 h-4 text-ctp-peach" />
+              <h3 className="font-medium">Guardrails</h3>
+            </div>
+
+            <p className="text-sm text-ctp-subtext0 mb-4">
+              Custom instructions applied to all AI CLI sessions. These are passed via <code className="px-1 py-0.5 bg-ctp-surface0 rounded">--append-system-prompt</code> for Claude Code, or equivalent for other tools.
+            </p>
+
+            <textarea
+              value={guardrails}
+              onChange={handleGuardrailsChange}
+              placeholder="Enter guardrails instructions here...&#10;&#10;Examples:&#10;- Always ask before making destructive changes&#10;- Follow project coding standards in CONTRIBUTING.md&#10;- Never commit directly to main branch"
+              className="w-full h-40 px-3 py-2 bg-ctp-base border border-ctp-surface0 rounded-lg text-sm focus:outline-none focus:border-ctp-mauve resize-none font-mono"
+            />
+
+            <div className="flex justify-end mt-3">
+              <button
+                onClick={handleSaveGuardrails}
+                disabled={guardrailsSaved}
+                className="px-4 py-2 bg-ctp-peach text-ctp-base rounded-lg hover:bg-ctp-peach/80 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium"
+              >
+                {guardrailsSaved ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Saved
+                  </>
+                ) : (
+                  <>
+                    <Shield className="w-4 h-4" />
+                    Save Guardrails
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 

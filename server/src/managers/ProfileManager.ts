@@ -17,6 +17,7 @@ export class ProfileManager extends EventEmitter {
   private profilesPath: string;
   private configPath: string;
   private allowedDirectories: string[];
+  private guardrails: string;
   private configDir: string;
 
   constructor(configDir: string = '/app/config') {
@@ -25,35 +26,38 @@ export class ProfileManager extends EventEmitter {
     this.profilesPath = path.join(configDir, 'profiles.json');
     this.configPath = path.join(configDir, 'config.json');
 
-    // Load directories from config file, env var, or use defaults
-    this.allowedDirectories = this.loadAllowedDirectories();
+    // Load config from file, env vars, or use defaults
+    const config = this.loadConfig();
+    this.allowedDirectories = config.allowedDirectories;
+    this.guardrails = config.guardrails;
     this.loadProfiles();
   }
 
-  // Load allowed directories from config file or defaults
-  private loadAllowedDirectories(): string[] {
+  // Load config from file or defaults
+  private loadConfig(): { allowedDirectories: string[]; guardrails: string } {
     const defaultDirs = ['/workspace', '/root', '/home', '/mnt', '/data', '/projects', '/app'];
+    const defaultGuardrails = '';
 
     // First try config file
     try {
       if (fs.existsSync(this.configPath)) {
         const config = JSON.parse(fs.readFileSync(this.configPath, 'utf-8'));
-        if (config.allowedDirectories && Array.isArray(config.allowedDirectories)) {
-          console.log(`Loaded ${config.allowedDirectories.length} allowed directories from config`);
-          return config.allowedDirectories;
-        }
+        const dirs = config.allowedDirectories && Array.isArray(config.allowedDirectories)
+          ? config.allowedDirectories
+          : (process.env.ALLOWED_DIRECTORIES?.split(',').map(d => d.trim()) || defaultDirs);
+        const guardrails = typeof config.guardrails === 'string' ? config.guardrails : defaultGuardrails;
+        console.log(`Loaded config: ${dirs.length} allowed directories, guardrails: ${guardrails ? 'set' : 'empty'}`);
+        return { allowedDirectories: dirs, guardrails };
       }
     } catch (error) {
       console.error('Failed to load config:', error);
     }
 
-    // Then try env var
-    if (process.env.ALLOWED_DIRECTORIES) {
-      return process.env.ALLOWED_DIRECTORIES.split(',').map(d => d.trim());
-    }
+    // Then try env vars
+    const dirs = process.env.ALLOWED_DIRECTORIES?.split(',').map(d => d.trim()) || defaultDirs;
+    const guardrails = process.env.GUARDRAILS || defaultGuardrails;
 
-    // Fall back to defaults
-    return defaultDirs;
+    return { allowedDirectories: dirs, guardrails };
   }
 
   // Save config to disk
@@ -63,7 +67,8 @@ export class ProfileManager extends EventEmitter {
         fs.mkdirSync(this.configDir, { recursive: true });
       }
       const config = {
-        allowedDirectories: this.allowedDirectories
+        allowedDirectories: this.allowedDirectories,
+        guardrails: this.guardrails
       };
       fs.writeFileSync(this.configPath, JSON.stringify(config, null, 2), 'utf-8');
     } catch (error) {
@@ -265,6 +270,18 @@ export class ProfileManager extends EventEmitter {
     this.allowedDirectories = directories.map(d => path.normalize(d));
     this.saveConfig();
     this.emit('configUpdated', { allowedDirectories: this.allowedDirectories });
+  }
+
+  // Get guardrails
+  getGuardrails(): string {
+    return this.guardrails;
+  }
+
+  // Set guardrails
+  setGuardrails(guardrails: string): void {
+    this.guardrails = guardrails;
+    this.saveConfig();
+    this.emit('configUpdated', { guardrails: this.guardrails });
   }
 
   // List directory contents (for file browser)

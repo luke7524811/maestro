@@ -16,6 +16,7 @@ import {
   CodexApprovalMode,
   SessionProfile
 } from '../types/index.js';
+import { profileManager } from './ProfileManager.js';
 
 interface TerminalSession {
   info: SessionInfo;
@@ -142,6 +143,23 @@ export class SessionManager extends EventEmitter {
           break;
         // 'default' - no flag needed
       }
+    }
+
+    // Add guardrails if configured
+    const guardrails = profileManager.getGuardrails();
+    if (guardrails && guardrails.trim()) {
+      // Escape single quotes in guardrails for shell safety
+      const escapedGuardrails = guardrails.replace(/'/g, "'\\''");
+      if (mode === TerminalMode.ClaudeCode) {
+        cmd += ` --append-system-prompt '${escapedGuardrails}'`;
+      } else if (mode === TerminalMode.OpenAiCodex) {
+        // Codex uses --instructions flag
+        cmd += ` --instructions '${escapedGuardrails}'`;
+      } else if (mode === TerminalMode.GeminiCli) {
+        // Gemini CLI uses --system flag
+        cmd += ` --system '${escapedGuardrails}'`;
+      }
+      // Plain terminal doesn't support guardrails
     }
 
     // Add custom flags
