@@ -69,10 +69,38 @@
 ## 🚀 Quick Start
 
 ### Prerequisites
-- [Docker](https://docker.com) installed
+- [Docker](https://docker.com) installed (works on Linux, macOS, Windows)
 - Modern web browser (Chrome, Firefox, Safari, Edge)
 
-### Option 1: Docker Run (Fastest)
+### Option 1: Docker Compose (Recommended)
+
+```bash
+git clone https://github.com/luke7524811/maestro.git
+cd maestro
+
+# Basic mode (workspace only)
+docker compose up -d maestro-web
+
+# Access at http://localhost:3100
+```
+
+### Option 2: With Host Filesystem Access
+
+For accessing files outside the workspace directory:
+
+```bash
+git clone https://github.com/luke7524811/maestro.git
+cd maestro
+
+# Copy and configure environment
+cp .env.example .env
+# Edit .env to set HOST_MOUNT_PATH for your OS (see below)
+
+# Run with full filesystem access
+docker compose --profile full up -d
+```
+
+### Option 3: Docker Run (Quick)
 
 ```bash
 # Create directories for persistent storage
@@ -87,34 +115,48 @@ docker run -d \
   -v "$PWD/config/claude:/root/.claude:rw" \
   -v "$PWD/config/gemini:/root/.config/gemini:rw" \
   -v "$PWD/config/codex:/root/.codex:rw" \
-  -v "$HOME/.ssh:/root/.ssh:ro" \
   maestro-web:latest
 
 # Access at http://localhost:3100
 ```
 
-### Option 2: Docker Compose (Recommended)
+---
+
+## 🌍 Cross-Platform Setup
+
+Maestro runs on any OS with Docker. Configure `.env` for your platform:
+
+### Linux
 
 ```bash
-git clone https://github.com/luke7524811/maestro.git
-cd maestro
-docker-compose up -d maestro-web
-
-# Access at http://localhost:3100
+# .env
+HOST_MOUNT_PATH=/home/username
+SSH_KEYS_PATH=/home/username/.ssh
 ```
 
-### Option 3: Build from Source
+### macOS
 
 ```bash
-git clone https://github.com/luke7524811/maestro.git
-cd maestro
-
-# Build the image
-docker build -t maestro-web .
-
-# Run with compose
-docker-compose up -d maestro-web
+# .env
+HOST_MOUNT_PATH=/Users/username
+SSH_KEYS_PATH=/Users/username/.ssh
 ```
+
+### Windows (Docker Desktop)
+
+```bash
+# .env - use forward slashes
+HOST_MOUNT_PATH=C:/Users/username
+SSH_KEYS_PATH=C:/Users/username/.ssh
+```
+
+### Deploy Modes
+
+| Mode | Command | Description |
+|------|---------|-------------|
+| **Basic** | `docker compose up -d` | Workspace only, no host access |
+| **Full** | `docker compose --profile full up -d` | Host filesystem + SSH keys |
+| **Dev** | `docker compose --profile dev up -d` | Hot reload for development |
 
 ---
 
@@ -208,50 +250,14 @@ environment:
 
 ## ⚙️ Configuration
 
-### Docker Compose Configuration
+### Environment Variables (.env)
 
-```yaml
-version: '3.8'
-
-services:
-  maestro-web:
-    build: .
-    container_name: maestro-web
-    restart: unless-stopped
-    ports:
-      - "3100:3100"
-    environment:
-      - NODE_ENV=production
-      - PORT=3100
-      - DEFAULT_SESSIONS=0
-      - PROJECT_PATH=/workspace
-      # Optional: API keys for non-interactive auth
-      # - ANTHROPIC_API_KEY=your-key-here
-      # - GEMINI_API_KEY=your-key-here
-      # - OPENAI_API_KEY=your-key-here
-    volumes:
-      # Mount workspace for projects
-      - ./workspace:/workspace:rw
-      # Persist Maestro config (profiles, allowed directories, favorites, guardrails)
-      - ./config/maestro:/app/config:rw
-      # Mount CLI config directories for persistent authentication
-      - ./config/claude:/root/.claude:rw
-      - ./config/gemini:/root/.config/gemini:rw
-      - ./config/codex:/root/.codex:rw
-      # SSH keys for git operations (optional)
-      - ~/.ssh:/root/.ssh:ro
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3100/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-```
-
-### Environment Variables
+Copy `.env.example` to `.env` and configure:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `NODE_ENV` | production | Runtime environment |
+| `HOST_MOUNT_PATH` | - | Host filesystem path to mount (platform-specific) |
+| `SSH_KEYS_PATH` | - | Path to SSH keys for git operations |
 | `PORT` | 3100 | HTTP server port |
 | `DEFAULT_SESSIONS` | 0 | Sessions to create on startup |
 | `PROJECT_PATH` | /workspace | Default working directory |
@@ -264,11 +270,31 @@ services:
 | Volume | Purpose | Permissions |
 |--------|---------|-------------|
 | `./workspace:/workspace` | Project files and code | Read/Write |
+| `${HOST_MOUNT_PATH}:/host` | Host filesystem (full profile) | Read/Write |
 | `./config/maestro:/app/config` | Maestro settings, profiles, favorites | Read/Write |
 | `./config/claude:/root/.claude` | Claude CLI credentials | Read/Write |
 | `./config/gemini:/root/.config/gemini` | Gemini CLI credentials | Read/Write |
 | `./config/codex:/root/.codex` | Codex CLI credentials | Read/Write |
-| `~/.ssh:/root/.ssh` | SSH keys for git operations | Read Only |
+| `${SSH_KEYS_PATH}:/root/.ssh` | SSH keys for git operations | Read Only |
+
+### Docker Compose Profiles
+
+| Service | Profile | Use Case |
+|---------|---------|----------|
+| `maestro-web` | (default) | Basic mode - workspace only |
+| `maestro-full` | `full` | Extended mode - host filesystem + SSH |
+| `maestro-dev` | `dev` | Development with hot reload |
+
+```bash
+# Basic
+docker compose up -d
+
+# Full (with host access)
+docker compose --profile full up -d
+
+# Development
+docker compose --profile dev up -d
+```
 
 ---
 

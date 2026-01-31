@@ -8,21 +8,19 @@ services:
     container_name: maestro-web
     restart: unless-stopped
     ports:
-      - "3100:3100"
+      - "${PORT:-3100}:3100"
     environment:
       - NODE_ENV=production
       - PORT=3100
-      - DEFAULT_SESSIONS=0
-      - PROJECT_PATH=/workspace
+      - DEFAULT_SESSIONS=${DEFAULT_SESSIONS:-0}
+      - PROJECT_PATH=${PROJECT_PATH:-/workspace}
       # API keys for CLI authentication (optional - can also use interactive login)
-      # - ANTHROPIC_API_KEY=your-key-here
-      # - GEMINI_API_KEY=your-key-here
-      # - OPENAI_API_KEY=your-key-here
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
     volumes:
-      # Mount host root filesystem for full access to all directories
-      # This allows sessions to start anywhere on the host
-      - /:/host:rw
-      # Mount workspace for projects (kept for backward compatibility)
+      # Mount workspace for projects (always available)
       - ./workspace:/workspace:rw
       # Persist Maestro config (profiles, allowed directories, favorites, guardrails)
       - ./config/maestro:/app/config:rw
@@ -30,8 +28,6 @@ services:
       - ./config/claude:/root/.claude:rw
       - ./config/gemini:/root/.config/gemini:rw
       - ./config/codex:/root/.codex:rw
-      # SSH keys for git operations (optional)
-      - ~/.ssh:/root/.ssh:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3100/api/health"]
       interval: 30s
@@ -41,14 +37,60 @@ services:
     labels:
       - "com.docker.compose.project=maestro-web"
 
-# Alternative: Development mode with hot reload
+  # Extended version with host filesystem access
+  # Use: docker compose --profile full up -d
+  maestro-full:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: maestro-full
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3100}:3100"
+    environment:
+      - NODE_ENV=production
+      - PORT=3100
+      - DEFAULT_SESSIONS=${DEFAULT_SESSIONS:-0}
+      - PROJECT_PATH=${PROJECT_PATH:-/workspace}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      # Tell the app the host mount path for path translation
+      - HOST_MOUNT_PATH=${HOST_MOUNT_PATH:-}
+    volumes:
+      # Mount host filesystem (configurable via .env)
+      # Linux: /home/user, macOS: /Users/user, Windows: C:/Users/user
+      - ${HOST_MOUNT_PATH:-.}:/host:rw
+      # Mount workspace for projects
+      - ./workspace:/workspace:rw
+      # Persist Maestro config
+      - ./config/maestro:/app/config:rw
+      # Mount CLI config directories for persistent authentication
+      - ./config/claude:/root/.claude:rw
+      - ./config/gemini:/root/.config/gemini:rw
+      - ./config/codex:/root/.codex:rw
+      # SSH keys for git operations (optional, configurable via .env)
+      - ${SSH_KEYS_PATH:-./config/ssh}:/root/.ssh:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3100/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "com.docker.compose.project=maestro-web"
+    profiles:
+      - full
+
+  # Development mode with hot reload
   maestro-dev:
     build:
       context: .
       dockerfile: Dockerfile.dev
     container_name: maestro-dev
     ports:
-      - "3100:3100"
+      - "${PORT:-3100}:3100"
       - "3000:3000"  # Vite dev server
     environment:
       - NODE_ENV=development
