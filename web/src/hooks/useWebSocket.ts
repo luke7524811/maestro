@@ -14,6 +14,7 @@ import {
 type MessageHandler = (sessionId: number, data: string) => void;
 type StateUpdateHandler = (session: SessionInfo) => void;
 type SessionListHandler = (state: AppState) => void;
+type SessionTerminatedHandler = (sessionId: number, session: SessionInfo) => void;
 
 interface UseWebSocketReturn {
   connected: boolean;
@@ -24,11 +25,13 @@ interface UseWebSocketReturn {
   closeSession: (sessionId: number) => void;
   setSessionMode: (sessionId: number, mode: TerminalMode) => void;
   setSessionBranch: (sessionId: number, branch: string | null) => void;
+  setSessionAllowedDirs: (sessionId: number, directories: string[]) => void;
   onOutput: (handler: MessageHandler) => void;
   onStatusUpdate: (handler: StateUpdateHandler) => void;
   onSessionList: (handler: SessionListHandler) => void;
   onSessionCreated: (handler: StateUpdateHandler) => void;
   onSessionClosed: (handler: (sessionId: number) => void) => void;
+  onSessionTerminated: (handler: SessionTerminatedHandler) => void;
 }
 
 export function useWebSocket(): UseWebSocketReturn {
@@ -42,6 +45,7 @@ export function useWebSocket(): UseWebSocketReturn {
   const sessionListHandlerRef = useRef<SessionListHandler | null>(null);
   const sessionCreatedHandlerRef = useRef<StateUpdateHandler | null>(null);
   const sessionClosedHandlerRef = useRef<((sessionId: number) => void) | null>(null);
+  const sessionTerminatedHandlerRef = useRef<SessionTerminatedHandler | null>(null);
 
   const connect = useCallback(() => {
     // Determine WebSocket URL based on current location
@@ -122,6 +126,18 @@ export function useWebSocket(): UseWebSocketReturn {
       case WSMessageType.SessionClosed: {
         if (message.sessionId !== undefined && sessionClosedHandlerRef.current) {
           sessionClosedHandlerRef.current(message.sessionId);
+        }
+        break;
+      }
+
+      case WSMessageType.SessionTerminated: {
+        const session = message.payload as SessionInfo;
+        if (message.sessionId !== undefined && sessionTerminatedHandlerRef.current) {
+          sessionTerminatedHandlerRef.current(message.sessionId, session);
+        }
+        // Also call status update handler to update the session info
+        if (statusUpdateHandlerRef.current) {
+          statusUpdateHandlerRef.current(session);
         }
         break;
       }
@@ -215,6 +231,14 @@ export function useWebSocket(): UseWebSocketReturn {
     });
   }, [send]);
 
+  const setSessionAllowedDirs = useCallback((sessionId: number, directories: string[]) => {
+    send({
+      type: WSMessageType.SessionSetAllowedDirs,
+      sessionId,
+      payload: { directories }
+    });
+  }, [send]);
+
   // Handler setters
   const onOutput = useCallback((handler: MessageHandler) => {
     outputHandlerRef.current = handler;
@@ -236,6 +260,10 @@ export function useWebSocket(): UseWebSocketReturn {
     sessionClosedHandlerRef.current = handler;
   }, []);
 
+  const onSessionTerminated = useCallback((handler: SessionTerminatedHandler) => {
+    sessionTerminatedHandlerRef.current = handler;
+  }, []);
+
   return {
     connected,
     sendInput,
@@ -245,10 +273,12 @@ export function useWebSocket(): UseWebSocketReturn {
     closeSession,
     setSessionMode,
     setSessionBranch,
+    setSessionAllowedDirs,
     onOutput,
     onStatusUpdate,
     onSessionList,
     onSessionCreated,
-    onSessionClosed
+    onSessionClosed,
+    onSessionTerminated
   };
 }

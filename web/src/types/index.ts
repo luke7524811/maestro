@@ -108,6 +108,7 @@ export interface SessionInfo {
   customFlags: string[];
   envVars: Record<string, string>;
   wrapperCommand: string | null;
+  allowedDirectories: string[];  // Additional directories the CLI can access
   // Error tracking
   errorMessage: string | null;
   lastOutput: string | null;
@@ -193,6 +194,7 @@ export interface SessionProfile {
   customFlags: string[];
   envVars: Record<string, string>;
   wrapperCommand: string | null;
+  allowedDirectories: string[];  // Additional directories the CLI can access
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
@@ -218,11 +220,13 @@ export enum WSMessageType {
   SessionResize = 'session:resize',
   SessionSetMode = 'session:setMode',
   SessionSetBranch = 'session:setBranch',
+  SessionSetAllowedDirs = 'session:setAllowedDirs',
   SessionOutput = 'session:output',
   SessionStatusUpdate = 'session:statusUpdate',
   SessionList = 'session:list',
   SessionCreated = 'session:created',
   SessionClosed = 'session:closed',
+  SessionTerminated = 'session:terminated',  // Process killed but session kept
   Error = 'error'
 }
 

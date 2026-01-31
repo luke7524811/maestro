@@ -17,6 +17,8 @@ import {
   Clock,
   X,
   Play,
+  RotateCcw,
+  Square,
   ChevronDown,
   ExternalLink,
   Settings,
@@ -32,13 +34,14 @@ import {
   TerminalModeConfig,
   TERMINAL_MODES
 } from '../types';
-import { Terminal, writeToTerminal } from './Terminal';
+import { Terminal, writeToTerminal, clearTerminal } from './Terminal';
 
 interface SessionCardProps {
   session: SessionInfo;
   isFocused?: boolean;
   onLaunch: (sessionId: number) => void;
   onClose: (sessionId: number) => void;
+  onTerminate?: (sessionId: number) => void;
   onInput: (sessionId: number, data: string) => void;
   onResize: (sessionId: number, cols: number, rows: number) => void;
   onSetMode: (sessionId: number, mode: TerminalMode) => void;
@@ -71,6 +74,7 @@ export const SessionCard: React.FC<SessionCardProps> = ({
   isFocused = false,
   onLaunch,
   onClose,
+  onTerminate,
   onInput,
   onResize,
   onSetMode,
@@ -124,6 +128,16 @@ export const SessionCard: React.FC<SessionCardProps> = ({
       onDuplicate(session.id);
     }
   }, [session.id, onDuplicate]);
+
+  // Handle terminate (stop without closing)
+  const handleTerminate = useCallback(() => {
+    if (onTerminate) {
+      onTerminate(session.id);
+    }
+  }, [session.id, onTerminate]);
+
+  // Check if session was previously launched (can be relaunched)
+  const canRelaunch = !session.isTerminalLaunched && session.workingDirectory;
 
   // Mode selector dropdown
   const [showModeMenu, setShowModeMenu] = React.useState(false);
@@ -283,8 +297,21 @@ export const SessionCard: React.FC<SessionCardProps> = ({
           </button>
         )}
 
-        {/* Launch button (pre-launch) */}
-        {!showTerminal && !session.shouldLaunchTerminal && (
+        {/* Relaunch button (for previously launched sessions) */}
+        {canRelaunch && (
+          <button
+            onClick={handleLaunch}
+            className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium text-white"
+            style={{ backgroundColor: modeConfig.color }}
+            title="Relaunch session"
+          >
+            <RotateCcw className="w-3 h-3" />
+            Relaunch
+          </button>
+        )}
+
+        {/* Launch button (pre-launch, new session) */}
+        {!showTerminal && !session.shouldLaunchTerminal && !canRelaunch && (
           <button
             onClick={handleLaunch}
             className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium text-white"
@@ -292,6 +319,18 @@ export const SessionCard: React.FC<SessionCardProps> = ({
           >
             <Play className="w-3 h-3" />
             Launch
+          </button>
+        )}
+
+        {/* Stop button (for running sessions) */}
+        {showTerminal && onTerminate && (
+          <button
+            onClick={handleTerminate}
+            className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium text-white bg-ctp-red hover:bg-ctp-red/80"
+            title="Stop session (keep card)"
+          >
+            <Square className="w-3 h-3" />
+            Stop
           </button>
         )}
 
@@ -328,18 +367,31 @@ export const SessionCard: React.FC<SessionCardProps> = ({
                 className="w-10 h-10 mx-auto mb-3 opacity-50"
                 color={modeConfig.color}
               />
-              <p className="text-sm text-ctp-subtext0 mb-2">
-                Select branch and click Launch
-              </p>
-              {session.assignedBranch ? (
-                <div className="flex items-center justify-center gap-1 text-xs text-ctp-blue">
-                  <span className="opacity-50">⎇</span>
-                  {session.assignedBranch}
-                </div>
+              {canRelaunch ? (
+                <>
+                  <p className="text-sm text-ctp-subtext0 mb-2">
+                    Session stopped - click Relaunch to restart
+                  </p>
+                  <p className="text-xs text-ctp-subtext1">
+                    {session.workingDirectory}
+                  </p>
+                </>
               ) : (
-                <p className="text-xs text-ctp-subtext0">
-                  Using current branch
-                </p>
+                <>
+                  <p className="text-sm text-ctp-subtext0 mb-2">
+                    Select branch and click Launch
+                  </p>
+                  {session.assignedBranch ? (
+                    <div className="flex items-center justify-center gap-1 text-xs text-ctp-blue">
+                      <span className="opacity-50">⎇</span>
+                      {session.assignedBranch}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-ctp-subtext0">
+                      Using current branch
+                    </p>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -414,4 +466,9 @@ export const SessionCard: React.FC<SessionCardProps> = ({
 // Export helper to write data to a session's terminal
 export function writeToSession(sessionId: number, data: string) {
   writeToTerminal(sessionId, data);
+}
+
+// Export helper to clear a session's terminal
+export function clearSession(sessionId: number) {
+  clearTerminal(sessionId);
 }

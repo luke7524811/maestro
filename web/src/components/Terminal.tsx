@@ -15,14 +15,20 @@ interface TerminalProps {
   onFocus?: () => void;
 }
 
-// Global registry for terminal write functions - more reliable than DOM queries
-const terminalRegistry = new Map<number, (data: string) => void>();
+// Terminal functions interface
+interface TerminalFunctions {
+  write: (data: string) => void;
+  clear: () => void;
+}
+
+// Global registry for terminal functions - more reliable than DOM queries
+const terminalRegistry = new Map<number, TerminalFunctions>();
 // Buffer for data that arrives before terminal is ready
 const pendingDataBuffer = new Map<number, string[]>();
 
-// Register a terminal's write function
-export function registerTerminal(sessionId: number, writeFn: (data: string) => void) {
-  terminalRegistry.set(sessionId, writeFn);
+// Register a terminal's functions
+export function registerTerminal(sessionId: number, writeFn: (data: string) => void, clearFn: () => void) {
+  terminalRegistry.set(sessionId, { write: writeFn, clear: clearFn });
   // Flush any pending data
   const pending = pendingDataBuffer.get(sessionId);
   if (pending && pending.length > 0) {
@@ -39,9 +45,9 @@ export function unregisterTerminal(sessionId: number) {
 
 // Write data to a terminal (buffers if terminal not ready)
 function writeToTerminalInternal(sessionId: number, data: string) {
-  const writeFn = terminalRegistry.get(sessionId);
-  if (writeFn) {
-    writeFn(data);
+  const fns = terminalRegistry.get(sessionId);
+  if (fns) {
+    fns.write(data);
   } else {
     // Buffer data until terminal is ready
     if (!pendingDataBuffer.has(sessionId)) {
@@ -53,6 +59,17 @@ function writeToTerminalInternal(sessionId: number, data: string) {
 }
 
 export const writeToTerminal = writeToTerminalInternal;
+
+// Clear a terminal's content
+export function clearTerminal(sessionId: number) {
+  const fns = terminalRegistry.get(sessionId);
+  if (fns) {
+    fns.clear();
+    console.log(`Cleared terminal for session ${sessionId}`);
+  }
+  // Also clear any pending data
+  pendingDataBuffer.delete(sessionId);
+}
 
 // Catppuccin Mocha theme - matches Swift installColors
 const CATPPUCCIN_THEME = {
@@ -90,24 +107,7 @@ export const Terminal: React.FC<TerminalProps> = ({
   const fitAddonRef = useRef<FitAddon | null>(null);
   const isDisposedRef = useRef(false);
 
-  // Handle incoming data from server
-  const writeData = useCallback((data: string) => {
-    if (terminalRef.current && !isDisposedRef.current) {
-      terminalRef.current.write(data);
-      // Auto-scroll to bottom when new data arrives
-      terminalRef.current.scrollToBottom();
-    }
-  }, []);
-
-  // Register terminal write function in global registry
-  useEffect(() => {
-    registerTerminal(sessionId, writeData);
-    return () => {
-      unregisterTerminal(sessionId);
-    };
-  }, [sessionId, writeData]);
-
-  // Initialize terminal - use empty deps to only run once
+  // Initialize terminal and register in global registry
   useEffect(() => {
     const container = containerRef.current;
     if (!container || terminalRef.current) return;
@@ -145,6 +145,24 @@ export const Terminal: React.FC<TerminalProps> = ({
     // Store refs immediately after opening
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
+
+    // Register terminal in global registry - must happen AFTER terminalRef is set
+    // so that write/clear functions have access to the terminal instance
+    registerTerminal(
+      sessionId,
+      (data: string) => {
+        if (terminalRef.current && !isDisposedRef.current) {
+          terminalRef.current.write(data);
+          terminalRef.current.scrollToBottom();
+        }
+      },
+      () => {
+        if (terminalRef.current && !isDisposedRef.current) {
+          terminalRef.current.clear();
+          terminalRef.current.reset();
+        }
+      }
+    );
 
     // Initial fit after a small delay to ensure DOM is ready
     const fitTimeout = setTimeout(() => {
@@ -197,6 +215,9 @@ export const Terminal: React.FC<TerminalProps> = ({
       resizeObserver.disconnect();
       dataDisposable.dispose();
       resizeDisposable.dispose();
+
+      // Unregister from global registry
+      unregisterTerminal(sessionId);
 
       // Clear refs before dispose to prevent race conditions
       terminalRef.current = null;

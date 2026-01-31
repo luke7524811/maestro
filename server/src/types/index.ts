@@ -121,6 +121,7 @@ export interface SessionInfo {
   customFlags: string[];
   envVars: Record<string, string>;
   wrapperCommand: string | null;
+  allowedDirectories: string[];  // Additional directories the CLI can access
   // Error tracking
   errorMessage: string | null;
   lastOutput: string | null;
@@ -151,6 +152,7 @@ export function createSession(id: number, mode: TerminalMode = TerminalMode.Clau
     customFlags: [],
     envVars: {},
     wrapperCommand: null,
+    allowedDirectories: [],  // Additional directories the CLI can access
     // Error tracking
     errorMessage: null,
     lastOutput: null
@@ -167,6 +169,7 @@ export enum WSMessageType {
   SessionResize = 'session:resize',
   SessionSetMode = 'session:setMode',
   SessionSetBranch = 'session:setBranch',
+  SessionSetAllowedDirs = 'session:setAllowedDirs',
 
   // Server -> Client
   SessionOutput = 'session:output',
@@ -174,6 +177,7 @@ export enum WSMessageType {
   SessionList = 'session:list',
   SessionCreated = 'session:created',
   SessionClosed = 'session:closed',
+  SessionTerminated = 'session:terminated',  // Process killed but session kept
   Error = 'error'
 }
 
@@ -265,6 +269,7 @@ export interface SessionProfile {
   customFlags: string[];
   envVars: Record<string, string>;
   wrapperCommand: string | null;
+  allowedDirectories: string[];  // Additional directories the CLI can access
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
@@ -281,6 +286,7 @@ export function createDefaultProfile(mode: TerminalMode): SessionProfile {
     customFlags: [],
     envVars: {},
     wrapperCommand: null,
+    allowedDirectories: [],
     isDefault: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()

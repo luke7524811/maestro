@@ -75,7 +75,7 @@
 ### Option 1: Docker Compose (Recommended)
 
 ```bash
-git clone https://github.com/luke7524811/maestro.git
+git clone https://github.com/YOUR_USERNAME/maestro.git
 cd maestro
 
 # Basic mode (workspace only)
@@ -89,7 +89,7 @@ docker compose up -d maestro-web
 For accessing files outside the workspace directory:
 
 ```bash
-git clone https://github.com/luke7524811/maestro.git
+git clone https://github.com/YOUR_USERNAME/maestro.git
 cd maestro
 
 # Copy and configure environment
@@ -479,6 +479,137 @@ docker start maestro-web
 
 ---
 
+## 🌐 Production Deployment
+
+### Reverse Proxy Setup
+
+When deploying Maestro Web behind a reverse proxy (nginx, Caddy, Traefik, etc.), ensure:
+
+1. **WebSocket Support** - Must upgrade connections to WebSocket for `/ws` path
+2. **Single Container** - Only ONE container should run on the target port
+3. **Consistent Port** - Match the proxy target port with container port
+
+#### Nginx Example
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name maestro.yourdomain.com;
+
+    # SSL configuration
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:3100;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # WebSocket support - REQUIRED
+    location /ws {
+        proxy_pass http://127.0.0.1:3100;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 86400;
+    }
+}
+```
+
+#### Caddy Example
+
+```caddy
+maestro.yourdomain.com {
+    reverse_proxy localhost:3100
+}
+```
+
+Caddy automatically handles WebSocket upgrades.
+
+### Container Management
+
+**Important**: Only ONE Maestro container should run at a time on your target port.
+
+```bash
+# Check running containers
+docker ps | grep maestro
+
+# Stop all Maestro containers before rebuilding
+docker stop maestro-web 2>/dev/null
+docker rm maestro-web 2>/dev/null
+
+# Rebuild and start fresh
+docker build -t maestro-web .
+docker run -d --name maestro-web -p 3100:3100 \
+  -v "$PWD/workspace:/workspace" \
+  maestro-web
+
+# Verify correct container is running
+docker ps | grep maestro
+curl http://localhost:3100/api/health
+```
+
+### Troubleshooting Deployment Issues
+
+#### ❌ UI Not Updating After Rebuild
+
+**Symptoms**: Browser shows old UI even after rebuilding Docker image
+
+**Diagnosis**:
+1. Check browser Network tab (F12) for which JS file is loading
+2. Check container logs for the JS hash being served
+3. Verify only one container is running on your target port
+
+```bash
+# List all running maestro containers
+docker ps -a | grep maestro
+
+# Check which JS file the container serves
+docker exec maestro-web ls /app/web/dist/assets/ | grep "index.*\.js"
+
+# Compare with browser's Network tab - hashes should match
+```
+
+**Common Causes**:
+- Multiple containers running on different ports
+- Reverse proxy pointing to wrong port/container
+- Browser loading cached old version (clear cache or use incognito)
+
+**Fix**:
+```bash
+# Stop ALL maestro containers
+docker stop $(docker ps -q --filter "name=maestro") 2>/dev/null
+docker rm $(docker ps -aq --filter "name=maestro") 2>/dev/null
+
+# Rebuild and run on the EXACT port your reverse proxy expects
+docker build -t maestro-web .
+docker run -d --name maestro-web -p 3100:3100 \
+  -v "$PWD/workspace:/workspace" \
+  maestro-web
+```
+
+#### ❌ WebSocket Connection Refused
+
+**Symptoms**: Terminals don't show output, "WebSocket connection failed" in console
+
+**Diagnosis**:
+```bash
+# Test direct connection
+curl -i http://localhost:3100/ws
+
+# Test through reverse proxy
+curl -i https://maestro.yourdomain.com/ws
+```
+
+**Fix**: Ensure reverse proxy has WebSocket upgrade configuration (see examples above)
+
+---
+
 ## 🛠️ Development
 
 ### Project Structure
@@ -511,7 +642,7 @@ maestro/
 
 ```bash
 # Clone repository
-git clone https://github.com/luke7524811/maestro.git
+git clone https://github.com/YOUR_USERNAME/maestro.git
 cd maestro
 
 # Development mode (hot reload)

@@ -45,14 +45,32 @@ export class WebSocketManager {
     console.log(`Client connected. Total clients: ${this.clients.size}`);
 
     // Send current session list
+    const sessions = sessionManager.getSessions();
     this.sendToClient(client, {
       type: WSMessageType.SessionList,
       payload: {
-        sessions: sessionManager.getSessions(),
+        sessions,
         projectPath: sessionManager.getProjectPath(),
         isRunning: sessionManager.getRunning()
       }
     });
+
+    // For running sessions, subscribe and replay buffered output
+    for (const session of sessions) {
+      if (session.isTerminalLaunched) {
+        client.subscribedSessions.add(session.id);
+
+        // Replay buffered output
+        const buffer = sessionManager.getSessionOutputBuffer(session.id);
+        if (buffer) {
+          this.sendToClient(client, {
+            type: WSMessageType.SessionOutput,
+            sessionId: session.id,
+            payload: { data: buffer }
+          });
+        }
+      }
+    }
 
     ws.on('message', (data: Buffer) => {
       try {
@@ -106,6 +124,10 @@ export class WebSocketManager {
 
       case WSMessageType.SessionSetBranch:
         this.handleSessionSetBranch(client, message);
+        break;
+
+      case WSMessageType.SessionSetAllowedDirs:
+        this.handleSessionSetAllowedDirs(client, message);
         break;
 
       default:
@@ -176,6 +198,14 @@ export class WebSocketManager {
     sessionManager.setBranch(message.sessionId, payload?.branch ?? null);
   }
 
+  private handleSessionSetAllowedDirs(client: ClientConnection, message: WSMessage): void {
+    if (!message.sessionId) return;
+    const payload = message.payload as { directories: string[] };
+    if (payload?.directories && Array.isArray(payload.directories)) {
+      sessionManager.setAllowedDirectories(message.sessionId, payload.directories);
+    }
+  }
+
   private setupSessionManagerListeners(): void {
     // Terminal output -> broadcast to subscribed clients
     sessionManager.on('sessionOutput', (sessionId: number, data: string) => {
@@ -210,6 +240,15 @@ export class WebSocketManager {
         type: WSMessageType.SessionClosed,
         sessionId,
         payload: null
+      });
+    });
+
+    // Session terminated (process killed but session kept) -> broadcast to all
+    sessionManager.on('sessionTerminated', (sessionId: number) => {
+      this.broadcast({
+        type: WSMessageType.SessionTerminated,
+        sessionId,
+        payload: sessionManager.getSession(sessionId)
       });
     });
 

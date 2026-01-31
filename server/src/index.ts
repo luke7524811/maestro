@@ -154,10 +154,22 @@ app.post('/api/start', (req, res) => {
   res.json({ running: true });
 });
 
-// Stop all sessions (exit "running" mode)
+// Stop all sessions - terminate processes but keep session cards
 app.post('/api/stop', (req, res) => {
+  const count = sessionManager.terminateAllSessions();
   sessionManager.setRunning(false);
-  res.json({ running: false });
+  res.json({ running: false, terminatedCount: count });
+});
+
+// Terminate a single session (stop process but keep session card)
+app.post('/api/sessions/:id/terminate', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const success = sessionManager.terminateSession(id);
+  if (success) {
+    res.json(sessionManager.getSession(id));
+  } else {
+    res.status(404).json({ error: 'Session not found' });
+  }
 });
 
 // Get status summary
@@ -278,6 +290,17 @@ app.patch('/api/sessions/:id/directory', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const { directory } = req.body;
   sessionManager.setWorkingDirectory(id, directory);
+  res.json(sessionManager.getSession(id));
+});
+
+// Update session allowed directories (for Claude Code --add-dir)
+app.patch('/api/sessions/:id/allowed-directories', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { directories } = req.body;
+  if (!Array.isArray(directories)) {
+    return res.status(400).json({ error: 'directories must be an array' });
+  }
+  sessionManager.setAllowedDirectories(id, directories);
   res.json(sessionManager.getSession(id));
 });
 

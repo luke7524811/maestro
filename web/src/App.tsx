@@ -16,7 +16,7 @@ import {
   Settings
 } from 'lucide-react';
 import { useWebSocket } from './hooks/useWebSocket';
-import { SessionCard, writeToSession } from './components/SessionCard';
+import { SessionCard, writeToSession, clearSession } from './components/SessionCard';
 import { SessionSettings } from './components/SessionSettings';
 import { AppSettings } from './components/AppSettings';
 import { CommandReference, CommandReferenceButton } from './components/CommandReference';
@@ -82,7 +82,8 @@ const App: React.FC = () => {
     onStatusUpdate,
     onSessionList,
     onSessionCreated,
-    onSessionClosed
+    onSessionClosed,
+    onSessionTerminated
   } = useWebSocket();
 
   // Handle initial session list from server
@@ -102,6 +103,15 @@ const App: React.FC = () => {
       terminalWritersRef.current.delete(sessionId);
     });
 
+    onSessionTerminated((sessionId: number, session: SessionInfo) => {
+      // Clear the terminal content when a session is terminated
+      clearSession(sessionId);
+      // Update session state
+      setSessions(prev => prev.map(s =>
+        s.id === session.id ? session : s
+      ));
+    });
+
     onStatusUpdate((session: SessionInfo) => {
       setSessions(prev => prev.map(s =>
         s.id === session.id ? session : s
@@ -111,7 +121,7 @@ const App: React.FC = () => {
     onOutput((sessionId: number, data: string) => {
       writeToSession(sessionId, data);
     });
-  }, [onSessionList, onSessionCreated, onSessionClosed, onStatusUpdate, onOutput]);
+  }, [onSessionList, onSessionCreated, onSessionClosed, onSessionTerminated, onStatusUpdate, onOutput]);
 
   // Handle session launch
   const handleLaunch = useCallback((sessionId: number) => {
@@ -128,6 +138,21 @@ const App: React.FC = () => {
   const handleClose = useCallback((sessionId: number) => {
     closeSession(sessionId);
   }, [closeSession]);
+
+  // Handle session terminate (stop without removing card)
+  const handleTerminate = useCallback(async (sessionId: number) => {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/terminate`, {
+        method: 'POST'
+      });
+      if (!res.ok) {
+        console.error('Failed to terminate session');
+      }
+      // The session update will come via WebSocket onSessionTerminated
+    } catch (error) {
+      console.error('Failed to terminate session:', error);
+    }
+  }, []);
 
   // Handle session input
   const handleInput = useCallback((sessionId: number, data: string) => {
@@ -201,6 +226,13 @@ const App: React.FC = () => {
           body: JSON.stringify({ wrapper: settings.wrapperCommand })
         });
       }
+      if (settings.allowedDirectories !== undefined) {
+        await fetch(`/api/sessions/${sessionId}/allowed-directories`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ directories: settings.allowedDirectories })
+        });
+      }
     } catch (error) {
       console.error('Failed to update session settings:', error);
     }
@@ -223,6 +255,7 @@ const App: React.FC = () => {
           customFlags: session.customFlags,
           envVars: session.envVars,
           wrapperCommand: session.wrapperCommand,
+          allowedDirectories: session.allowedDirectories,
           isDefault: false
         })
       });
@@ -472,6 +505,7 @@ const App: React.FC = () => {
                 isFocused={focusedSessionId === session.id}
                 onLaunch={handleLaunch}
                 onClose={handleClose}
+                onTerminate={handleTerminate}
                 onInput={handleInput}
                 onResize={handleResize}
                 onSetMode={handleSetMode}

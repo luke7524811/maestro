@@ -36,6 +36,12 @@ const OUTPUT_BUFFER_MAX = 10000; // chars
 // Patterns for detecting session state - matches Swift checkSpecialPatterns
 const WAITING_PATTERNS = ['(y/n)', '[y/n]', '(yes/no)', '[yes/no]', 'confirm?', 'permission', 'allow this', 'approve'];
 const ERROR_PATTERNS = ['error:', 'failed:', 'exception:', 'fatal:', 'command not found', 'permission denied', 'not recognized'];
+// Patterns that look like errors but should be ignored (informational warnings)
+const ERROR_IGNORE_PATTERNS = ['cursor position could not be read', 'warning:'];
+
+// DSR (Device Status Report) escape sequences that need immediate response
+// \x1b[6n = cursor position query - expects response \x1b[row;colR
+const DSR_CURSOR_QUERY = '\x1b[6n';
 
 // Server URL patterns - matches Swift checkForServerReady
 const SERVER_PATTERNS = [
@@ -158,6 +164,11 @@ export class SessionManager extends EventEmitter {
     return this.sessions.get(id)?.info;
   }
 
+  // Get session output buffer for replay on reconnect
+  getSessionOutputBuffer(id: number): string | undefined {
+    return this.sessions.get(id)?.outputBuffer;
+  }
+
   // Set project path - matches Swift setProjectPath
   setProjectPath(path: string): void {
     this.projectPath = path;
@@ -207,6 +218,7 @@ export class SessionManager extends EventEmitter {
         customFlags: [...sourceInfo.customFlags],
         envVars: { ...sourceInfo.envVars },
         wrapperCommand: sourceInfo.wrapperCommand,
+        allowedDirectories: [...(sourceInfo.allowedDirectories || [])],
         customRunCommand: sourceInfo.customRunCommand,
         // Reset runtime state - new session starts fresh
         status: SessionStatus.Idle,
@@ -247,6 +259,11 @@ export class SessionManager extends EventEmitter {
     const mode = session.info.mode;
     const modeConfig = TerminalModeConfig[mode];
     let cmd = modeConfig.command || 'bash';
+
+    // Add terminal compatibility flags for Codex (fixes cursor position timeout in PTY)
+    if (mode === TerminalMode.OpenAiCodex) {
+      cmd += ' --no-alt-screen';
+    }
 
     // Add permission flags based on mode
     if (mode === TerminalMode.ClaudeCode && session.info.permissionMode) {
@@ -294,6 +311,15 @@ export class SessionManager extends EventEmitter {
         cmd += ` --system '${escapedGuardrails}'`;
       }
       // Plain terminal doesn't support guardrails
+    }
+
+    // Add allowed directories for Claude Code
+    if (mode === TerminalMode.ClaudeCode && session.info.allowedDirectories && session.info.allowedDirectories.length > 0) {
+      for (const dir of session.info.allowedDirectories) {
+        // Escape single quotes in directory path for shell safety
+        const escapedDir = dir.replace(/'/g, "'\\''");
+        cmd += ` --add-dir '${escapedDir}'`;
+      }
     }
 
     // Add custom flags
@@ -404,6 +430,17 @@ export class SessionManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
+    // Intercept DSR cursor position queries and respond immediately
+    // This fixes Codex CLI timeout when it queries cursor position before UI is ready
+    if (data.includes(DSR_CURSOR_QUERY) && session.pty) {
+      // Respond with cursor at row 1, col 1 (standard response)
+      // Format: ESC [ row ; col R
+      session.pty.write('\x1b[1;1R');
+      // Strip the query from output to avoid confusing the terminal
+      data = data.replace(DSR_CURSOR_QUERY, '');
+      if (!data) return; // Nothing else to process
+    }
+
     session.outputBuffer += data;
     session.lastOutputTime = new Date();
 
@@ -454,6 +491,14 @@ export class SessionManager extends EventEmitter {
     // Check error patterns
     for (const pattern of ERROR_PATTERNS) {
       if (lowercased.includes(pattern)) {
+        // Check if this matches an ignore pattern (false positive)
+        const shouldIgnore = ERROR_IGNORE_PATTERNS.some(ignorePattern =>
+          lowercased.includes(ignorePattern)
+        );
+        if (shouldIgnore) {
+          continue; // Skip this error pattern, it's a false positive
+        }
+
         session.info.status = SessionStatus.Error;
         // Extract the line containing the error for display
         const lines = text.split('\n');
@@ -651,6 +696,14 @@ export class SessionManager extends EventEmitter {
     this.emit('sessionStatusUpdate', session.info);
   }
 
+  // Set allowed directories (for Claude Code --add-dir flag)
+  setAllowedDirectories(sessionId: number, directories: string[]): void {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.info.isTerminalLaunched) return;
+    session.info.allowedDirectories = directories;
+    this.emit('sessionStatusUpdate', session.info);
+  }
+
   // Apply profile to session
   applyProfile(sessionId: number, profile: SessionProfile): void {
     const session = this.sessions.get(sessionId);
@@ -662,6 +715,7 @@ export class SessionManager extends EventEmitter {
     session.info.customFlags = [...profile.customFlags];
     session.info.envVars = { ...profile.envVars };
     session.info.wrapperCommand = profile.wrapperCommand;
+    session.info.allowedDirectories = [...(profile.allowedDirectories || [])];
     if (profile.workingDirectory) {
       session.info.workingDirectory = profile.workingDirectory;
     }
@@ -709,6 +763,59 @@ export class SessionManager extends EventEmitter {
     for (const id of this.sessions.keys()) {
       this.closeSession(id);
     }
+  }
+
+  // Terminate session process but keep the session (reusable)
+  terminateSession(sessionId: number): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) return false;
+
+    // Clear timers
+    if (session.idleTimer) {
+      clearTimeout(session.idleTimer);
+      session.idleTimer = null;
+    }
+    if (session.initTimer) {
+      clearTimeout(session.initTimer);
+      session.initTimer = null;
+    }
+
+    // Kill PTY process if running
+    if (session.pty) {
+      try {
+        session.pty.kill();
+      } catch (e) {
+        // Process may already be dead
+      }
+      session.pty = null;
+    }
+
+    // Reset session state to idle (reusable)
+    session.info.status = SessionStatus.Idle;
+    session.info.isTerminalLaunched = false;
+    session.info.isClaudeRunning = false;
+    session.info.terminalPid = 0;
+    session.info.errorMessage = null;
+    session.info.lastOutput = null;
+    session.outputBuffer = '';
+    session.lastOutputTime = null;
+
+    // Emit events for frontend update
+    this.emit('sessionTerminated', sessionId);
+    this.emit('sessionStatusUpdate', session.info);
+
+    return true;
+  }
+
+  // Terminate all sessions (stop processes but keep session cards)
+  terminateAllSessions(): number {
+    let count = 0;
+    for (const id of this.sessions.keys()) {
+      if (this.terminateSession(id)) {
+        count++;
+      }
+    }
+    return count;
   }
 
   // Update session status

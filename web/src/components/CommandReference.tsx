@@ -126,14 +126,6 @@ export const CommandReference: React.FC<CommandReferenceProps> = ({ onClose }) =
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-ctp-surface1 rounded text-ctp-blue font-mono text-[10px]">Ctrl+Shift+C</kbd>
-              <span className="text-ctp-subtext0">Copy</span>
-            </span>
-            <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-ctp-surface1 rounded text-ctp-blue font-mono text-[10px]">Ctrl+Shift+V</kbd>
-              <span className="text-ctp-subtext0">Paste</span>
-            </span>
-            <span className="flex items-center gap-1">
               <kbd className="px-1.5 py-0.5 bg-ctp-surface1 rounded text-ctp-blue font-mono text-[10px]">Alt+1-9</kbd>
               <span className="text-ctp-subtext0">Focus session</span>
             </span>
@@ -157,6 +149,9 @@ export const CommandReference: React.FC<CommandReferenceProps> = ({ onClose }) =
               <kbd className="px-1.5 py-0.5 bg-ctp-surface1 rounded text-ctp-blue font-mono text-[10px]">Esc</kbd>
               <span className="text-ctp-subtext0">Close modal</span>
             </span>
+          </div>
+          <div className="mt-2 text-[10px] text-ctp-overlay0">
+            Terminal: Right-click to copy/paste, or select text to copy
           </div>
         </div>
 
@@ -262,12 +257,12 @@ export const CommandReferenceButton: React.FC<{ onClick: () => void }> = ({ onCl
     <button
       onClick={onClick}
       className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-ctp-surface0 text-ctp-subtext0 hover:text-ctp-mauve text-xs"
-      title="Command Reference & Keyboard Shortcuts"
+      title="Command Reference & Keyboard Shortcuts (Alt+/)"
     >
       <BookOpen className="w-4 h-4" />
       <span className="hidden sm:inline">Commands</span>
       <span className="hidden md:flex items-center gap-1 text-[10px] text-ctp-overlay0">
-        <kbd className="px-1 py-0.5 bg-ctp-surface0 rounded font-mono">Ctrl+Shift+C/V</kbd>
+        <kbd className="px-1 py-0.5 bg-ctp-surface0 rounded font-mono">Alt+/</kbd>
       </span>
     </button>
   );

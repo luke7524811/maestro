@@ -17,7 +17,10 @@ import {
   X,
   Save,
   Bookmark,
-  Download
+  Download,
+  Plus,
+  Trash2,
+  FolderPlus
 } from 'lucide-react';
 import {
   SessionInfo,
@@ -38,6 +41,7 @@ interface SessionProfile {
   customFlags: string[];
   envVars: Record<string, string>;
   wrapperCommand: string | null;
+  allowedDirectories: string[];
   isDefault: boolean;
 }
 
@@ -62,7 +66,10 @@ export const SessionSettings: React.FC<SessionSettingsProps> = ({
     Object.entries(session.envVars || {}).map(([k, v]) => `${k}=${v}`).join('\n')
   );
   const [wrapperCommand, setWrapperCommand] = useState(session.wrapperCommand || '');
+  const [allowedDirectories, setAllowedDirectories] = useState<string[]>(session.allowedDirectories || []);
+  const [newAllowedDir, setNewAllowedDir] = useState('');
   const [showDirBrowser, setShowDirBrowser] = useState(false);
+  const [showAllowedDirBrowser, setShowAllowedDirBrowser] = useState(false);
   const [showProfileSave, setShowProfileSave] = useState(false);
   const [profileName, setProfileName] = useState('');
   const [activeTab, setActiveTab] = useState<'basic' | 'advanced'>('basic');
@@ -95,6 +102,7 @@ export const SessionSettings: React.FC<SessionSettingsProps> = ({
       Object.entries(profile.envVars || {}).map(([k, v]) => `${k}=${v}`).join('\n')
     );
     setWrapperCommand(profile.wrapperCommand || '');
+    setAllowedDirectories(profile.allowedDirectories || []);
     setShowProfileLoad(false);
   }, []);
 
@@ -120,10 +128,32 @@ export const SessionSettings: React.FC<SessionSettingsProps> = ({
       workingDirectory: workingDirectory || null,
       customFlags: flags,
       envVars,
-      wrapperCommand: wrapperCommand || null
+      wrapperCommand: wrapperCommand || null,
+      allowedDirectories
     });
     onClose();
-  }, [mode, permissionMode, workingDirectory, customFlags, envVarsText, wrapperCommand, onSave, onClose]);
+  }, [mode, permissionMode, workingDirectory, customFlags, envVarsText, wrapperCommand, allowedDirectories, onSave, onClose]);
+
+  // Add an allowed directory
+  const handleAddAllowedDir = useCallback(() => {
+    const dir = newAllowedDir.trim();
+    if (dir && !allowedDirectories.includes(dir)) {
+      setAllowedDirectories([...allowedDirectories, dir]);
+      setNewAllowedDir('');
+    }
+  }, [newAllowedDir, allowedDirectories]);
+
+  // Remove an allowed directory
+  const handleRemoveAllowedDir = useCallback((dir: string) => {
+    setAllowedDirectories(allowedDirectories.filter(d => d !== dir));
+  }, [allowedDirectories]);
+
+  // Add root access helper
+  const handleAddRootAccess = useCallback(() => {
+    if (!allowedDirectories.includes('/')) {
+      setAllowedDirectories([...allowedDirectories, '/']);
+    }
+  }, [allowedDirectories]);
 
   const handleSaveAsProfile = useCallback(() => {
     if (profileName.trim() && onSaveAsProfile) {
@@ -294,6 +324,89 @@ export const SessionSettings: React.FC<SessionSettingsProps> = ({
                 />
                 <p className="text-xs text-ctp-subtext0 mt-1">Prefix command (e.g., time, strace -o log.txt)</p>
               </div>
+
+              {/* Allowed directories (for Claude Code) */}
+              {mode === TerminalMode.ClaudeCode && (
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium mb-2">
+                    <FolderPlus className="w-4 h-4" />
+                    Allowed Directories
+                  </label>
+                  <p className="text-xs text-ctp-subtext0 mb-2">
+                    Additional directories the CLI can access beyond the working directory (--add-dir flags)
+                  </p>
+
+                  {/* Current allowed directories */}
+                  {allowedDirectories.length > 0 && (
+                    <div className="space-y-1 mb-2">
+                      {allowedDirectories.map(dir => (
+                        <div
+                          key={dir}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-ctp-base rounded border border-ctp-surface0"
+                        >
+                          <Folder className="w-4 h-4 text-ctp-blue" />
+                          <span className="flex-1 text-sm font-mono truncate">{dir}</span>
+                          <button
+                            onClick={() => handleRemoveAllowedDir(dir)}
+                            className="p-0.5 hover:bg-ctp-surface0 rounded text-ctp-subtext0 hover:text-ctp-red"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add new directory */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newAllowedDir}
+                      onChange={e => setNewAllowedDir(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleAddAllowedDir()}
+                      placeholder="/path/to/directory"
+                      className="flex-1 px-3 py-1.5 bg-ctp-base border border-ctp-surface0 rounded text-sm focus:border-ctp-mauve outline-none font-mono"
+                    />
+                    <button
+                      onClick={() => setShowAllowedDirBrowser(true)}
+                      className="px-2 py-1.5 bg-ctp-surface0 hover:bg-ctp-surface1 rounded"
+                      title="Browse"
+                    >
+                      <Folder className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={handleAddAllowedDir}
+                      disabled={!newAllowedDir.trim()}
+                      className="px-2 py-1.5 bg-ctp-surface0 hover:bg-ctp-surface1 rounded disabled:opacity-50"
+                      title="Add"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Quick access button */}
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={handleAddRootAccess}
+                      disabled={allowedDirectories.includes('/')}
+                      className="text-xs px-2 py-1 bg-ctp-red/20 text-ctp-red hover:bg-ctp-red/30 rounded disabled:opacity-50"
+                    >
+                      + Full System Access (/)
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!allowedDirectories.includes('/home')) {
+                          setAllowedDirectories([...allowedDirectories, '/home']);
+                        }
+                      }}
+                      disabled={allowedDirectories.includes('/home')}
+                      className="text-xs px-2 py-1 bg-ctp-blue/20 text-ctp-blue hover:bg-ctp-blue/30 rounded disabled:opacity-50"
+                    >
+                      + Home (/home)
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -397,6 +510,21 @@ export const SessionSettings: React.FC<SessionSettingsProps> = ({
             setShowDirBrowser(false);
           }}
           onClose={() => setShowDirBrowser(false)}
+        />
+      )}
+
+      {/* Allowed directory browser modal */}
+      {showAllowedDirBrowser && (
+        <DirectoryBrowser
+          currentPath={newAllowedDir || '/'}
+          onSelect={path => {
+            if (!allowedDirectories.includes(path)) {
+              setAllowedDirectories([...allowedDirectories, path]);
+            }
+            setShowAllowedDirBrowser(false);
+            setNewAllowedDir('');
+          }}
+          onClose={() => setShowAllowedDirBrowser(false)}
         />
       )}
     </div>
